@@ -46,6 +46,7 @@
   .bar.small { width: 150px; height: 9px; }
   .bar > i { display: block; height: 100%; transition: width .1s linear; }
   #hpFill { background: #e24f4f; width: 100%; }
+  #staFill { background: #6fe26f; width: 100%; }
   #xpFill { background: #4ab3ff; width: 0%; }
   #weaponTxt { color: #cfd8de; }
 
@@ -126,6 +127,7 @@
 <div id="hud" class="hidden">
   <div>OLEADA <b id="wave">1</b> &nbsp; PUNTOS <b id="score">0</b> &nbsp; <span class="money">$<span id="money">0</span></span></div>
   <div>Vida <div class="bar"><i id="hpFill"></i></div></div>
+  <div>Energía <div class="bar small"><i id="staFill"></i></div></div>
   <div>Nivel <b id="level">1</b> <div class="bar small"><i id="xpFill"></i></div></div>
   <div id="weaponTxt">Pistola · 12 / 12</div>
   <div class="small" style="margin-top:6px;color:#7c8893">ESC: pausa / tienda · M: silenciar</div>
@@ -197,11 +199,11 @@ const SC = 2; // factor de escala (resolución duplicada respecto al diseño ori
 // spread: dispersión (rad) · pierce: enemigos que atraviesa · unlock: nivel · price: $
 const WEAPONS = {
   pistol:  { name:'Pistola',        dmg:1, fireCd:0.18, mag:12,  reserve:96,  reload:1.0, spd:330, pellets:1, spread:0.05, pierce:0, unlock:1, price:0,    auto:false, barrel:7,  col:'#2a2d33', kick:2 },
-  smg:     { name:'Subfusil',       dmg:1, fireCd:0.07, mag:30,  reserve:180, reload:1.4, spd:340, pellets:1, spread:0.12, pierce:0, unlock:2, price:350,  auto:true,  barrel:8,  col:'#3a3d44', kick:2 },
-  shotgun: { name:'Escopeta',       dmg:1, fireCd:0.55, mag:6,   reserve:42,  reload:1.6, spd:300, pellets:7, spread:0.55, pierce:0, unlock:3, price:700,  auto:false, barrel:9,  col:'#5a3a22', kick:6 },
-  rifle:   { name:'Fusil de Asalto',dmg:2, fireCd:0.11, mag:30,  reserve:180, reload:1.5, spd:420, pellets:1, spread:0.06, pierce:1, unlock:4, price:1200, auto:true,  barrel:11, col:'#26301f', kick:3 },
-  sniper:  { name:'Francotirador',  dmg:8, fireCd:0.95, mag:5,   reserve:35,  reload:1.8, spd:650, pellets:1, spread:0.0,  pierce:4, unlock:5, price:1700, auto:false, barrel:13, col:'#1f2630', kick:8 },
-  lmg:     { name:'Ametralladora',  dmg:2, fireCd:0.05, mag:100, reserve:400, reload:2.6, spd:400, pellets:1, spread:0.14, pierce:1, unlock:7, price:2600, auto:true,  barrel:12, col:'#2d2d2d', kick:2 },
+  smg:     { name:'Subfusil',       dmg:1, fireCd:0.07, mag:30,  reserve:180, reload:1.4, spd:340, pellets:1, spread:0.12, pierce:0, unlock:3, price:900,   auto:true,  barrel:8,  col:'#3a3d44', kick:2 },
+  shotgun: { name:'Escopeta',       dmg:1, fireCd:0.55, mag:6,   reserve:42,  reload:1.6, spd:300, pellets:7, spread:0.55, pierce:0, unlock:5, price:1800,  auto:false, barrel:9,  col:'#5a3a22', kick:6 },
+  rifle:   { name:'Fusil de Asalto',dmg:2, fireCd:0.11, mag:30,  reserve:180, reload:1.5, spd:420, pellets:1, spread:0.06, pierce:1, unlock:7, price:3200,  auto:true,  barrel:11, col:'#26301f', kick:3 },
+  sniper:  { name:'Francotirador',  dmg:8, fireCd:0.95, mag:5,   reserve:35,  reload:1.8, spd:650, pellets:1, spread:0.0,  pierce:4, unlock:9, price:5000,  auto:false, barrel:13, col:'#1f2630', kick:8 },
+  lmg:     { name:'Ametralladora',  dmg:2, fireCd:0.05, mag:100, reserve:400, reload:2.6, spd:400, pellets:1, spread:0.14, pierce:1, unlock:12, price:8500, auto:true,  barrel:12, col:'#2d2d2d', kick:2 },
 };
 const WEAPON_ORDER = ['pistol','smg','shotgun','rifle','sniper','lmg'];
 // Cuchillo: respaldo cuando te quedas sin balas
@@ -211,7 +213,7 @@ for (const id in WEAPONS) { WEAPONS[id].spd *= SC; WEAPONS[id].barrel *= SC; }
 KNIFE.range *= SC;
 
 // ====================== GUARDADO (persistente) ======================
-const SAVE_KEY = 'pixelZombiesSave_v1';
+const SAVE_KEY = 'pixelZombiesSave_v2';
 let save;
 function loadSave() {
   try { save = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch(e) { save = null; }
@@ -226,7 +228,7 @@ function loadSave() {
   save.map      = save.map      ?? 'snow';
 }
 function persist() { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); }
-function xpForNext(lvl) { return 70 + lvl * 55; }
+function xpForNext(lvl) { return 100 + lvl * lvl * 22; }
 loadSave();
 
 // ====================== SONIDO (Web Audio, sintetizado) ======================
@@ -305,6 +307,7 @@ const Sfx = {
   empty()   { this.noise({dur:0.04, vol:0.18, freq:2000}); },
   bang()    { this.beep({type:'square', f:95, f2:45, dur:0.12, vol:0.35}); this.noise({dur:0.08, vol:0.22, freq:320, filter:'lowpass'}); },
   crash()   { this.noise({dur:0.35, vol:0.55, freq:600, filter:'lowpass'}); this.beep({type:'square', f:150, f2:50, dur:0.28, vol:0.32}); },
+  smash()   { this.noise({dur:0.16, vol:0.4, freq:1200, filter:'bandpass', q:0.8}); this.beep({type:'square', f:200, f2:80, dur:0.1, vol:0.18}); },
 };
 Sfx.muted = !!save.muted;
 
@@ -474,10 +477,10 @@ const zombieTank = sprite([
 
 // ====================== TIPOS DE ZOMBIE ======================
 const ZTYPES = {
-  normal:  { id:'normal',  hp:5,  speed:24, dmg:8,  r:5, score:10, cash:6,  xp:12, sprite:zombieA,    blood:'#b22b2b' },
-  runner:  { id:'runner',  hp:4,  speed:54, dmg:6,  r:4, score:16, cash:9,  xp:16, sprite:zombieRun,  blood:'#b22b2b' },
-  spitter: { id:'spitter', hp:8,  speed:20, dmg:7,  r:5, score:26, cash:16, xp:22, sprite:zombieSpit, blood:'#5a8a2a', ranged:true },
-  tank:    { id:'tank',    hp:26, speed:13, dmg:18, r:9, score:45, cash:28, xp:36, sprite:zombieTank, blood:'#6e1f1f', big:true },
+  normal:  { id:'normal',  hp:5,  speed:24, dmg:8,  r:5, score:10, cash:3,  xp:6,  sprite:zombieA,    blood:'#b22b2b' },
+  runner:  { id:'runner',  hp:4,  speed:54, dmg:6,  r:4, score:16, cash:5,  xp:8,  sprite:zombieRun,  blood:'#b22b2b' },
+  spitter: { id:'spitter', hp:8,  speed:20, dmg:7,  r:5, score:26, cash:9,  xp:12, sprite:zombieSpit, blood:'#5a8a2a', ranged:true },
+  tank:    { id:'tank',    hp:26, speed:13, dmg:18, r:9, score:45, cash:16, xp:18, sprite:zombieTank, blood:'#6e1f1f', big:true },
 };
 for (const k in ZTYPES) { ZTYPES[k].speed *= SC; ZTYPES[k].r *= SC; }
 
@@ -632,7 +635,7 @@ let world, curRegion;
 function newRegion(id, kind) {
   return { id, kind, grid:new Uint8Array(GX*GY), bg:null,
            edges:{l:null,r:null,u:null,d:null}, doors:[],
-           zombies:[], pickups:[], decals:[], spawned:false, exitX:0, exitY:0,
+           zombies:[], pickups:[], decals:[], props:[], spawned:false, exitX:0, exitY:0,
            doorHP:100, broken:false, bangCd:0, breachCd:0 };
 }
 function gget(reg,cx,cy){ return (cx<0||cy<0||cx>=GX||cy>=GY)?1:reg.grid[cy*GX+cx]; }
@@ -766,8 +769,6 @@ function paintCity(reg){
     if (v===1) paintRoof(g,x,y,reg,cx,cy);
     else { paintFloor(g,x,y,reg,cx,cy); if (v===3) paintDoor(g,x,y); }
   }
-  for (let cy=0;cy<GY;cy++) for (let cx=0;cx<GX;cx++)
-    if (reg.grid[cy*GX+cx]===2) paintObstacle(g,cx*CELL,cy*CELL);
   decorateDebris(g,reg);
   reg.bg=b;
 }
@@ -783,12 +784,75 @@ function paintRoom(reg){
       if (v===3) paintDoor(g,x,y);
     }
   }
-  for (let cy=0;cy<GY;cy++) for (let cx=0;cx<GX;cx++) if (reg.grid[cy*GX+cx]===2){
-    const x=cx*CELL, y=cy*CELL;
-    g.fillStyle='#14161b'; g.fillRect(x+2*SC,y+2*SC,CELL-4*SC,CELL-4*SC);
-    g.fillStyle='#7a5a32'; g.fillRect(x+3*SC,y+3*SC,CELL-6*SC,CELL-6*SC);
-  }
   reg.bg=b;
+}
+
+// ---- Objetos destructibles (cajas/contenedores) ----
+function buildProps(reg){
+  reg.props = [];
+  for (let cy=0;cy<GY;cy++) for (let cx=0;cx<GX;cx++) if (reg.grid[cy*GX+cx]===2){
+    const room = reg.kind==='room';
+    let kind = room?'crate':'container', hp = room?4:8;
+    if (Math.random() < 0.14) { kind='chest'; hp=6; }   // cofre con botín garantizado
+    reg.props.push({ cx, cy, x:cx*CELL, y:cy*CELL, alive:true, kind, hp, maxHp:hp });
+  }
+}
+function drawProp(p){
+  const x=p.x, y=p.y;
+  if (p.kind==='chest'){
+    ctx.fillStyle='#14161b'; ctx.fillRect(x+2*SC,y+2*SC,CELL-4*SC,CELL-4*SC);
+    ctx.fillStyle='#6e4a26'; ctx.fillRect(x+3*SC,y+5*SC,CELL-6*SC,CELL-8*SC);   // madera
+    ctx.fillStyle='#caa53a'; ctx.fillRect(x+3*SC,y+5*SC,CELL-6*SC,3*SC);        // borde dorado
+    ctx.fillRect(x+3*SC,y+CELL*0.46,CELL-6*SC,3*SC);                            // banda dorada
+    ctx.fillStyle='#e0c050'; ctx.fillRect(x+CELL*0.45,y+CELL*0.4,4*SC,7*SC);    // cerradura
+  } else if (p.kind==='crate'){
+    ctx.fillStyle='#14161b'; ctx.fillRect(x+2*SC,y+2*SC,CELL-4*SC,CELL-4*SC);
+    ctx.fillStyle='#7a5a32'; ctx.fillRect(x+3*SC,y+3*SC,CELL-6*SC,CELL-6*SC);
+    ctx.fillStyle='#5e4426'; ctx.fillRect(x+3*SC,y+CELL*0.46,CELL-6*SC,3*SC);
+    ctx.fillRect(x+CELL*0.47,y+3*SC,3*SC,CELL-6*SC);
+  } else {
+    ctx.fillStyle='#14161b'; ctx.fillRect(x+2*SC,y+2*SC,CELL-4*SC,CELL-4*SC);
+    ctx.fillStyle='#46603a'; ctx.fillRect(x+4*SC,y+4*SC,CELL-8*SC,CELL-8*SC);
+    ctx.fillStyle='#33492b'; ctx.fillRect(x+4*SC,y+4*SC,CELL-8*SC,4*SC);
+  }
+  const dmg = 1 - p.hp/p.maxHp;
+  ctx.strokeStyle='#0d0f12'; ctx.lineWidth=SC;
+  if (dmg>0.33){ ctx.beginPath(); ctx.moveTo(x+CELL*0.3,y+CELL*0.25); ctx.lineTo(x+CELL*0.6,y+CELL*0.72); ctx.stroke(); }
+  if (dmg>0.66){ ctx.beginPath(); ctx.moveTo(x+CELL*0.72,y+CELL*0.3); ctx.lineTo(x+CELL*0.4,y+CELL*0.74); ctx.stroke(); }
+}
+function propDebris(x,y,col){
+  for (let i=0;i<9;i++){ const a=Math.random()*6.283, s=(20+Math.random()*90)*SC;
+    particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:0.3+Math.random()*0.3,col,size:(1+(Math.random()*2|0))*SC}); }
+}
+function damageProp(x,y,dmg){
+  const cx=Math.floor(x/CELL), cy=Math.floor(y/CELL);
+  if (cx<0||cy<0||cx>=GX||cy>=GY || curRegion.grid[cy*GX+cx]!==2) return false;
+  const p = curRegion.props.find(pp=>pp.alive && pp.cx===cx && pp.cy===cy);
+  if (!p) return false;
+  p.hp -= dmg;
+  propDebris(x, y, p.kind==='crate'?'#8a6638':'#46603a');
+  if (p.hp<=0){
+    p.alive=false; curRegion.grid[cy*GX+cx]=0;   // libera el paso
+    const cxp = p.x+CELL/2, cyp = p.y+CELL/2;
+    Sfx.smash();
+    propDebris(cxp, cyp, p.kind==='crate'?'#5e4426':'#33492b');
+    if (p.kind==='chest'){
+      // cofre: botín garantizado (dinero + munición + a veces vida)
+      const bonus = 30 + (Math.random()*40|0);
+      save.money += bonus; Sfx.cash(); toast(`¡Cofre! +$${bonus}`);
+      spawnPickup('ammo', cxp, cyp);
+      if (Math.random()<0.6) spawnPickup('health', cxp+CELL*0.6, cyp);
+      updateHud();
+    } else if (Math.random()<0.16){
+      // ¡susto! zombie escondido dentro
+      makeZombie(cxp, cyp, 0.4); shake = Math.min(shake+4, 9); Sfx.zombieDeath();
+    } else if (Math.random()<0.4){
+      spawnPickup(undefined, cxp, cyp);   // botín normal
+    }
+  } else {
+    Sfx.impact();
+  }
+  return true;
 }
 
 function buildCityWorld() {
@@ -807,6 +871,7 @@ function buildCityWorld() {
   addEnterableBuilding(world.regions['c_1_0'], 'room_oficina');
   addEnterableBuilding(world.regions['c_0_2'], 'room_tienda');
   addEnterableBuilding(world.regions['c_2_1'], 'room_casa');
+  for (const id in world.regions) buildProps(world.regions[id]);
   for (const id in world.regions)
     (world.regions[id].kind==='room' ? paintRoom : paintCity)(world.regions[id]);
   curRegion = world.regions['c_1_1'];
@@ -925,6 +990,7 @@ function ensureWeaponState(id) {
 function reset() {
   player = { x:W/2, y:H/2, r:5*SC, speed:74*SC, hp:100, maxHp:100,
              ang:0, reloading:0, fireCd:0, hurtFlash:0, knifeCd:0, meleeFx:0, transCd:0.4,
+             stamina:100, maxStamina:100, exhausted:false,
              mags:{}, res:{}, curId:save.equipped };
   for (const id of save.owned) ensureWeaponState(id);
   ensureWeaponState(save.equipped);
@@ -964,6 +1030,11 @@ function spawnZombie() {
     else if (side===1){ x=W+14*SC; y=Math.random()*H; }
     else if (side===2){ x=Math.random()*W; y=H+14*SC; }
     else { x=-14*SC; y=Math.random()*H; }
+  } else if (curRegion.kind === 'room') {
+    // entran por el hueco de la puerta rota
+    x = curRegion.exitX + (Math.random()-0.5)*CELL*1.6;
+    y = curRegion.exitY - CELL*0.6 - Math.random()*CELL;
+    if (solidAt(x,y)) { x = curRegion.exitX; y = curRegion.exitY - CELL; }
   } else {
     // celda de suelo libre lejos del jugador
     let tries=0;
@@ -973,16 +1044,18 @@ function spawnZombie() {
     } while ((solidAt(x,y) || Math.hypot(x-player.x,y-player.y) < 180) && tries<50);
     if (solidAt(x,y)) return; // sin sitio
   }
+  makeZombie(x, y);
+}
+// crea un zombie en una posición concreta (reutilizable: spawn, sustos de cajas, etc.)
+function makeZombie(x, y, atkCd) {
   const tp = pickZombieType();
-  // la vida crece con la oleada
-  const hp = Math.round(tp.hp * (1 + wave*0.10) + Math.floor(wave/3));
-  // variante sangrienta para el normal
+  const hp = Math.round(tp.hp * (1 + wave*0.10) + Math.floor(wave/3));   // vida crece con la oleada
   const zsprite = (tp.id==='normal' && Math.random()<0.4) ? zombieB : tp.sprite;
   zombies.push({
     x, y, r:tp.r, type:tp,
     speed: tp.speed + (Math.random()*8 + wave*1.2)*SC,
     hp, maxHp:hp, dmg:tp.dmg, sprite:zsprite,
-    ang:0, wob:Math.random()*Math.PI*2, hitFlash:0, atkCd:0, shootCd:1+Math.random()*1.5,
+    ang:0, wob:Math.random()*Math.PI*2, hitFlash:0, atkCd:atkCd||0, shootCd:1+Math.random()*1.5,
   });
 }
 
@@ -1053,6 +1126,10 @@ function melee() {
     bloodBurst(z.x, z.y, Math.cos(player.ang)*120, Math.sin(player.ang)*120, z.hp<=0?12:4);
     if (z.hp <= 0) { gainKill(z); decals.push({x:z.x, y:z.y}); }
   }
+  // rompe cajas justo delante con el cuchillo
+  const fx = player.x + Math.cos(player.ang)*KNIFE.range;
+  const fy = player.y + Math.sin(player.ang)*KNIFE.range;
+  damageProp(fx, fy, KNIFE.dmg);
 }
 
 function shoot() {
@@ -1098,10 +1175,10 @@ function gainKill(z) {
   else if (roll < 0.16) spawnPickup('ammo', z.x, z.y);
   // progresión de oleada por número de muertes
   killsThisWave++;
-  if (killsThisWave >= 8 + wave*2) {
+  if (killsThisWave >= 10 + wave*3) {
     killsThisWave = 0; wave++;
-    const bonus = 40 + wave*15;
-    save.money += bonus; addXp(20 + wave*4);
+    const bonus = 15 + wave*6;
+    save.money += bonus; addXp(8 + wave*2);
     Sfx.wave(); toast(`¡Oleada ${wave}! +$${bonus}`);
     persist();
   }
@@ -1130,7 +1207,20 @@ function update(dt) {
   if (keys['w']) dy--; if (keys['s']) dy++;
   if (keys['a']) dx--; if (keys['d']) dx++;
   const len = Math.hypot(dx,dy) || 1;
-  const run = keys['shift'] ? 1.55 : 1;
+  const moving = (dx!==0 || dy!==0);
+  // estamina: correr (Shift) la gasta; se recupera al no correr
+  const running = keys['shift'] && moving && player.stamina > 0 && !player.exhausted;
+  if (running) {
+    player.stamina = Math.max(0, player.stamina - 34*dt);
+    if (player.stamina === 0) player.exhausted = true;       // agotado: a recuperar
+  } else {
+    player.stamina = Math.min(player.maxStamina, player.stamina + 22*dt);
+    if (player.exhausted && player.stamina >= 30) player.exhausted = false;
+  }
+  const run = running ? 1.55 : 1;
+  const sf = document.getElementById('staFill');
+  sf.style.width = (player.stamina/player.maxStamina*100)+'%';
+  sf.style.background = player.exhausted ? '#e2754f' : (running ? '#ffd24a' : '#6fe26f');
   // a menos vida, más lento (de 100% a 55% de velocidad)
   const slow = 0.55 + 0.45*(player.hp/player.maxHp);
   const mvx = (dx/len)*player.speed*run*slow*dt;
@@ -1159,7 +1249,7 @@ function update(dt) {
 
   for (const b of bullets) {
     b.x += b.vx*dt; b.y += b.vy*dt; b.life -= dt;
-    if (solidAt(b.x, b.y)) b.life = 0;   // las balas chocan con las paredes
+    if (solidAt(b.x, b.y)) { damageProp(b.x, b.y, b.dmg); b.life = 0; }  // paredes / cajas
   }
 
   for (const z of zombies) {
@@ -1245,16 +1335,25 @@ function update(dt) {
   for (const p of particles) { p.x += p.vx*dt; p.y += p.vy*dt; p.vx*=0.92; p.vy*=0.92; p.life -= dt; }
   particles = particles.filter(p => p.life > 0);
 
-  // spawner continuo (solo en calles/campo; los interiores son seguros)
-  if (curRegion.kind !== 'room') {
+  // spawner continuo
+  if (curRegion.kind === 'room') {
+    updateSiege(dt);   // los zombies de la calle aporrean/derriban la puerta
+    // con la puerta rota, la casa deja de ser segura: siguen entrando
+    if (curRegion.broken) {
+      const target = 4 + wave;
+      spawnTimer -= dt;
+      if (zombies.length < target && spawnTimer <= 0) {
+        spawnZombie();
+        spawnTimer = Math.max(0.7, 1.6 - wave*0.03);
+      }
+    }
+  } else {
     const target = 5 + wave;
     spawnTimer -= dt;
     if (zombies.length < target && spawnTimer <= 0) {
       spawnZombie();
       spawnTimer = Math.max(0.4, 1.3 - wave*0.03);
     }
-  } else {
-    updateSiege(dt);   // los zombies de la calle derriban la puerta
   }
 
   if (shake > 0) shake -= dt*18;
@@ -1284,6 +1383,9 @@ function draw() {
     ctx.fillRect(dc.x-2*SC, dc.y-2*SC, 4*SC, 4*SC);
   }
   for (const p of particles) { ctx.fillStyle = p.col; ctx.fillRect(p.x|0, p.y|0, p.size, p.size); }
+
+  // cajas/contenedores destructibles
+  for (const p of curRegion.props) if (p.alive) drawProp(p);
 
   // puerta del interior bajo asedio
   if (curRegion.kind === 'room') drawRoomDoor();
