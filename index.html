@@ -2,8 +2,16 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Pixel Zombies - Survival</title>
+<!-- PWA: instalable en iPhone/Android/Mac y jugable sin conexion -->
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#0c0f14">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Pixel Zombies">
+<link rel="apple-touch-icon" href="./icons/icon-180.png">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body {
@@ -119,6 +127,47 @@
     opacity: 0; transition: opacity .25s; pointer-events: none; text-align:center;
   }
   #toast.show { opacity: 1; }
+
+  /* ---- Controles tactiles (solo movil) ---- */
+  #touch {
+    position: fixed; inset: 0; z-index: 6;
+    touch-action: none; -webkit-user-select: none; user-select: none;
+    -webkit-touch-callout: none;
+  }
+  .stick {
+    position: fixed; width: 120px; height: 120px; margin: -60px 0 0 -60px;
+    border-radius: 50%; display: none; pointer-events: none;
+    background: rgba(20,25,32,.32); border: 2px solid rgba(255,255,255,.16);
+  }
+  .stick.aim { background: rgba(40,20,20,.32); border-color: rgba(226,79,79,.45); }
+  .stick > i {
+    position: absolute; left: 50%; top: 50%; width: 54px; height: 54px;
+    margin: -27px 0 0 -27px; border-radius: 50%; border: 2px solid rgba(0,0,0,.4);
+    background: rgba(111,226,111,.55);
+  }
+  .stick.aim > i { background: rgba(226,79,79,.6); }
+  .tbtn {
+    position: fixed; width: 60px; height: 60px; border-radius: 50%; z-index: 7;
+    font-family: inherit; font-size: 22px; font-weight: bold; line-height: 1;
+    background: rgba(20,25,32,.55); color: #cfd8de; border: 2px solid rgba(255,255,255,.22);
+    touch-action: none; -webkit-user-select: none; user-select: none;
+  }
+  .tbtn.on { background: rgba(255,210,74,.78); color: #0c0f14; }
+  #tPause  { top:    calc(14px + env(safe-area-inset-top));    right: calc(14px + env(safe-area-inset-right)); }
+  #tReload { bottom: calc(96px + env(safe-area-inset-bottom)); right: calc(18px + env(safe-area-inset-right)); }
+  #tRun    { bottom: calc(24px + env(safe-area-inset-bottom)); right: calc(18px + env(safe-area-inset-right)); }
+
+  /* ---- Aviso para girar el telefono (movil en vertical) ---- */
+  #rotate { display: none; }
+  @media (orientation: portrait) and (pointer: coarse) {
+    #rotate {
+      position: fixed; inset: 0; z-index: 50;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: #0c0f14; text-align: center; padding: 30px;
+    }
+    #rotate .ico { font-size: 56px; margin-bottom: 16px; animation: spin 2s ease-in-out infinite; }
+    @keyframes spin { 0%,60% { transform: rotate(0); } 80%,100% { transform: rotate(-90deg); } }
+  }
 </style>
 </head>
 <body>
@@ -134,6 +183,22 @@
 </div>
 
 <div id="toast"></div>
+
+<!-- Controles tactiles (aparecen solo en pantallas tactiles durante el juego) -->
+<div id="touch" class="hidden">
+  <div id="stickMove" class="stick"><i></i></div>
+  <div id="stickAim" class="stick aim"><i></i></div>
+  <button id="tPause" class="tbtn" aria-label="Pausa">II</button>
+  <button id="tReload" class="tbtn" aria-label="Recargar">&#10227;</button>
+  <button id="tRun" class="tbtn" aria-label="Correr">&#187;</button>
+</div>
+
+<!-- Aviso: girar el telefono a horizontal -->
+<div id="rotate">
+  <div class="ico">&#128241;</div>
+  <h2 style="font-size:22px;letter-spacing:2px;color:#ffd24a">GIRA EL TELEFONO</h2>
+  <p style="color:#b8c2cc;margin-top:10px">Pon el telefono en horizontal para jugar.</p>
+</div>
 
 <!-- Menú principal / Game over -->
 <div id="menu" class="screen">
@@ -1099,6 +1164,90 @@ cv.addEventListener('mousemove', e => {
 cv.addEventListener('mousedown', () => { Sfx.unlock(); if(running && !paused) mouse.down = true; });
 addEventListener('mouseup', () => mouse.down = false);
 
+// ---- CONTROLES TACTILES (movil / tablet) ----
+// Twin-stick: joystick izquierdo = moverse · joystick derecho = apuntar + disparar.
+// Los sticks son "flotantes": aparecen donde tocas.
+const IS_TOUCH = window.matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
+const touchInput = { moveX:0, moveY:0, moveActive:false, aimX:0, aimY:0, aimActive:false, run:false };
+const elTouch = document.getElementById('touch');
+const stickMove = document.getElementById('stickMove');
+const stickAim  = document.getElementById('stickAim');
+const STICK_R = 58;          // radio maximo del stick (px)
+let moveId = null, aimId = null, moveOrigin = null, aimOrigin = null;
+
+function placeStick(el, ox, oy, dx, dy) {
+  el.style.left = ox + 'px'; el.style.top = oy + 'px';
+  el.firstElementChild.style.transform = `translate(${dx}px, ${dy}px)`;
+}
+function resetTouch() {
+  moveId = aimId = null;
+  touchInput.moveActive = touchInput.aimActive = touchInput.run = false;
+  stickMove.style.display = 'none';
+  stickAim.style.display = 'none';
+  document.getElementById('tRun')?.classList.remove('on');
+}
+
+if (IS_TOUCH) {
+  elTouch.addEventListener('pointerdown', e => {
+    if (e.target.classList.contains('tbtn')) return;   // los botones se gestionan solos
+    if (!running || paused) return;
+    Sfx.unlock();
+    const half = window.innerWidth / 2;
+    if (e.clientX < half && moveId === null) {
+      moveId = e.pointerId; moveOrigin = { x:e.clientX, y:e.clientY };
+      stickMove.style.display = 'block'; placeStick(stickMove, e.clientX, e.clientY, 0, 0);
+    } else if (e.clientX >= half && aimId === null) {
+      aimId = e.pointerId; aimOrigin = { x:e.clientX, y:e.clientY };
+      stickAim.style.display = 'block'; placeStick(stickAim, e.clientX, e.clientY, 0, 0);
+    }
+    e.preventDefault();
+  }, { passive:false });
+
+  elTouch.addEventListener('pointermove', e => {
+    if (e.pointerId === moveId) {
+      let dx = e.clientX - moveOrigin.x, dy = e.clientY - moveOrigin.y;
+      const m = Math.hypot(dx, dy); if (m > STICK_R) { dx = dx/m*STICK_R; dy = dy/m*STICK_R; }
+      placeStick(stickMove, moveOrigin.x, moveOrigin.y, dx, dy);
+      if (Math.hypot(dx, dy) > 8) { touchInput.moveX = dx/STICK_R; touchInput.moveY = dy/STICK_R; touchInput.moveActive = true; }
+      else touchInput.moveActive = false;
+      e.preventDefault();
+    } else if (e.pointerId === aimId) {
+      let dx = e.clientX - aimOrigin.x, dy = e.clientY - aimOrigin.y;
+      const m = Math.hypot(dx, dy); if (m > STICK_R) { dx = dx/m*STICK_R; dy = dy/m*STICK_R; }
+      placeStick(stickAim, aimOrigin.x, aimOrigin.y, dx, dy);
+      if (Math.hypot(dx, dy) > 10) { touchInput.aimX = dx; touchInput.aimY = dy; touchInput.aimActive = true; }
+      else touchInput.aimActive = false;
+      e.preventDefault();
+    }
+  }, { passive:false });
+
+  const endPointer = e => {
+    if (e.pointerId === moveId) { moveId = null; touchInput.moveActive = false; stickMove.style.display = 'none'; }
+    if (e.pointerId === aimId)  { aimId  = null; touchInput.aimActive  = false; stickAim.style.display  = 'none'; }
+  };
+  elTouch.addEventListener('pointerup', endPointer);
+  elTouch.addEventListener('pointercancel', endPointer);
+
+  // botones de accion
+  document.getElementById('tReload').addEventListener('pointerdown', e => {
+    e.preventDefault(); e.stopPropagation(); if (running && !paused) reload();
+  });
+  const tRun = document.getElementById('tRun');
+  tRun.addEventListener('pointerdown', e => {
+    e.preventDefault(); e.stopPropagation();
+    touchInput.run = !touchInput.run; tRun.classList.toggle('on', touchInput.run);
+  });
+  document.getElementById('tPause').addEventListener('pointerdown', e => {
+    e.preventDefault(); e.stopPropagation(); togglePause();
+  });
+
+  // instrucciones adaptadas al movil en el menu
+  const help = document.querySelector('#menu p[style]');
+  if (help) help.innerHTML =
+    '<span class="key">Joystick izq.</span> moverse · <span class="key">Joystick der.</span> apuntar y disparar · ' +
+    'botones <span class="key">&#10227;</span> recargar · <span class="key">&#187;</span> correr · <span class="key">II</span> pausa';
+}
+
 function reload() {
   const wp = equippedWeapon();
   if (player.reloading > 0 || player.ammo === wp.mag || player.reserve <= 0) return;
@@ -1204,12 +1353,12 @@ function onLevelUp() {
 // ====================== UPDATE ======================
 function update(dt) {
   let dx=0, dy=0;
-  if (keys['w']) dy--; if (keys['s']) dy++;
-  if (keys['a']) dx--; if (keys['d']) dx++;
+  if (touchInput.moveActive) { dx = touchInput.moveX; dy = touchInput.moveY; }   // joystick movil
+  else { if (keys['w']) dy--; if (keys['s']) dy++; if (keys['a']) dx--; if (keys['d']) dx++; }
   const len = Math.hypot(dx,dy) || 1;
   const moving = (dx!==0 || dy!==0);
-  // estamina: correr (Shift) la gasta; se recupera al no correr
-  const running = keys['shift'] && moving && player.stamina > 0 && !player.exhausted;
+  // estamina: correr (Shift o boton tactil) la gasta; se recupera al no correr
+  const running = (keys['shift'] || touchInput.run) && moving && player.stamina > 0 && !player.exhausted;
   if (running) {
     player.stamina = Math.max(0, player.stamina - 34*dt);
     if (player.stamina === 0) player.exhausted = true;       // agotado: a recuperar
@@ -1228,7 +1377,8 @@ function update(dt) {
   moveCollide(player, player.x+mvx, player.y+mvy);   // colisión con edificios/obstáculos
   if (player.transCd > 0) player.transCd -= dt;
   handleTransitions();                                // cambio de región / puertas
-  player.ang = Math.atan2(mouse.y-player.y, mouse.x-player.x);
+  if (touchInput.aimActive) player.ang = Math.atan2(touchInput.aimY, touchInput.aimX);  // joystick movil
+  else player.ang = Math.atan2(mouse.y-player.y, mouse.x-player.x);
 
   if (player.fireCd > 0) player.fireCd -= dt;
   if (player.hurtFlash > 0) player.hurtFlash -= dt;
@@ -1243,9 +1393,13 @@ function update(dt) {
       updateHud();
     }
   }
-  // disparo: auto si se mantiene, semi si un clic
+  // disparo: raton (clic) o joystick de apuntado en movil
   const wp = equippedWeapon();
-  if (mouse.down) { shoot(); if (!wp.auto) mouse.down = false; }
+  if (mouse.down || touchInput.aimActive) {
+    shoot();
+    // raton semi-auto: un disparo por clic. En movil, mantener el stick dispara a cadencia.
+    if (!wp.auto && mouse.down && !touchInput.aimActive) mouse.down = false;
+  }
 
   for (const b of bullets) {
     b.x += b.vx*dt; b.y += b.vy*dt; b.life -= dt;
@@ -1453,10 +1607,12 @@ function draw() {
   ctx.fillText(regionLabel(), W/2, 24*SC);
   ctx.textAlign='left';
 
-  ctx.strokeStyle='#1a1d22'; ctx.lineWidth=SC; ctx.beginPath();
-  ctx.moveTo(mouse.x-6*SC, mouse.y); ctx.lineTo(mouse.x+6*SC, mouse.y);
-  ctx.moveTo(mouse.x, mouse.y-6*SC); ctx.lineTo(mouse.x, mouse.y+6*SC);
-  ctx.stroke();
+  if (!IS_TOUCH) {   // la mira sigue al raton; en movil se apunta con el joystick
+    ctx.strokeStyle='#1a1d22'; ctx.lineWidth=SC; ctx.beginPath();
+    ctx.moveTo(mouse.x-6*SC, mouse.y); ctx.lineTo(mouse.x+6*SC, mouse.y);
+    ctx.moveTo(mouse.x, mouse.y-6*SC); ctx.lineTo(mouse.x, mouse.y+6*SC);
+    ctx.stroke();
+  }
 }
 
 function drawRoomDoor() {
@@ -1695,6 +1851,7 @@ function togglePause() {
   paused = !paused;
   if (paused) {
     mouse.down = false;
+    resetTouch();
     document.getElementById('pWave').textContent = Math.max(wave,1);
     document.getElementById('pScore').textContent = score;
     document.getElementById('pMoney').textContent = save.money;
@@ -1723,6 +1880,7 @@ function startGame() {
   elPause.classList.add('hidden');
   elShop.classList.add('hidden');
   hud.classList.remove('hidden');
+  if (IS_TOUCH) elTouch.classList.remove('hidden');
   updateHud();
   last = performance.now();
   requestAnimationFrame(loop);
@@ -1733,6 +1891,7 @@ function gameOver() {
   if (score > save.best) save.best = score;
   persist();
   hud.classList.add('hidden');
+  elTouch.classList.add('hidden'); resetTouch();
   elMenu.classList.remove('hidden');
   document.getElementById('menuTitle')?.remove();
   elMenu.querySelector('h1').textContent = 'HAS MUERTO';
@@ -1769,11 +1928,18 @@ document.getElementById('quitBtn').addEventListener('click', () => {
   running = false; paused = false;
   elPause.classList.add('hidden');
   hud.classList.add('hidden');
+  elTouch.classList.add('hidden'); resetTouch();
   elMenu.classList.remove('hidden');
   refreshMenuStats();
 });
 
 refreshMenuStats();
+
+// ====================== PWA ======================
+// Registra el service worker: permite instalar el juego y jugar sin conexion.
+if ('serviceWorker' in navigator) {
+  addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
+}
 </script>
 </body>
 </html>
