@@ -248,6 +248,51 @@
   .act.locked { background: #232a33; color: #e2754f; cursor: not-allowed; }
   .tag { font-size: clamp(13px,2.6vmin,16px); color: var(--gold); }
 
+  /* ---- Pestañas del arsenal ---- */
+  #shopTabs { display:flex; gap:8px; justify-content:center; margin-bottom:clamp(6px,1.4vmin,12px); flex-wrap:wrap; }
+  .shop-tab {
+    font-family: var(--ui); text-transform:uppercase; letter-spacing:1px;
+    font-size: clamp(13px,2.6vmin,18px); padding: clamp(6px,1.4vmin,10px) clamp(12px,2.6vmin,20px);
+    background:#2b323c; color:#cdd6de; border:2px solid #05070a; cursor:pointer;
+  }
+  .shop-tab:hover { filter: brightness(1.12); }
+  .shop-tab.on { background: var(--toxic); color:#04121d; }
+
+  /* ---- Barra de habilidades (perk + gadgets) ---- */
+  .hud-abilities {
+    position: fixed; left: 50%; transform: translateX(-50%);
+    bottom: calc(10px + env(safe-area-inset-bottom));
+    display: flex; gap: clamp(8px,1.6vmin,14px); z-index: 8; pointer-events: none;
+  }
+  .abil {
+    position: relative; width: clamp(46px,11vmin,60px); height: clamp(46px,11vmin,60px);
+    background: linear-gradient(180deg, rgba(28,34,43,.82), rgba(14,18,24,.82));
+    border: 2px solid rgba(255,255,255,.18); border-radius: 10px;
+    display: flex; align-items: center; justify-content: center; overflow: hidden;
+    box-shadow: 0 4px 12px rgba(0,0,0,.45);
+    -webkit-user-select: none; user-select: none; touch-action: none;
+  }
+  .abil.ready  { border-color: var(--toxic); }
+  .abil.broken { border-color: #e2754f; filter: grayscale(.4); }
+  .abil:active { filter: brightness(1.25); }
+  .abil-ico { font-size: clamp(20px,5vmin,28px); line-height: 1; }
+  .abil-key {
+    position: absolute; top: 2px; left: 4px; font-family: var(--mono);
+    font-size: clamp(9px,1.8vmin,12px); color: #cdd6de; opacity:.85;
+  }
+  .abil-cd {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 0;
+    background: rgba(6,9,13,.66); pointer-events: none;
+  }
+  .abil-info {
+    position: absolute; bottom: 1px; right: 4px; font-family: var(--mono);
+    font-size: clamp(9px,1.8vmin,12px); color: #ffd24a; text-shadow: 1px 1px 0 #000;
+  }
+  @media (pointer: coarse) {
+    .abil-key { display: none; }
+    .hud-abilities { pointer-events: auto; }   /* en móvil sí se tocan */
+  }
+
   /* ---- Ajustes ---- */
   .settings-box { display: flex; flex-direction: column; gap: clamp(8px,1.6vmin,14px); width: min(460px, 92vw); margin-top: clamp(4px,1.2vmin,12px); }
   .setting-row {
@@ -370,6 +415,9 @@
   </div>
 </div>
 
+<!-- Barra de habilidades (perk + gadgets): fuera del HUD para poder tocarla -->
+<div class="hud-abilities hidden" id="abilityBar"></div>
+
 <div id="toast"></div>
 
 <!-- Controles tactiles (aparecen solo en pantallas tactiles durante el juego) -->
@@ -401,7 +449,8 @@
   <p style="font-size:.92em">
     <span class="key">WASD</span> moverse · <span class="key">Ratón</span> apuntar ·
     <span class="key">Clic</span> disparar · <span class="key">R</span> recargar ·
-    <span class="key">Shift</span> correr · <span class="key">ESC</span> pausa
+    <span class="key">Shift</span> correr · <span class="key">Espacio</span> dash ·
+    <span class="key">Q</span>/<span class="key">E</span> gadgets · <span class="key">ESC</span> pausa
   </p>
   <div class="row">
     <button class="btn" id="playBtn">JUGAR</button>
@@ -435,6 +484,11 @@
   <div id="shopBar">
     <span>Dinero: <b class="money">$<span id="shopMoney">0</span></b></span>
     <span>Nivel: <b class="lvl"><span id="shopLevel">1</span></b></span>
+  </div>
+  <div id="shopTabs">
+    <button class="shop-tab on" data-tab="weapons">ARMAS</button>
+    <button class="shop-tab" data-tab="perks">PERKS</button>
+    <button class="shop-tab" data-tab="gadgets">GADGETS</button>
   </div>
   <div class="grid" id="shopGrid"></div>
   <button class="btn ghost" id="shopBack" style="margin-top:6px">VOLVER</button>
@@ -501,6 +555,26 @@ for (const id in WEAPONS) {
 }
 KNIFE.range *= SC;
 
+// ====================== PERKS & GADGETS ======================
+// Perks: solo puedes llevar 1 equipado a la vez.
+const PERKS = {
+  dash: { name:'Dash', icon:'💨', cd:30, dur:0.16, speed:560*SC,
+          desc:'Impulso veloz en la dirección a la que apuntas. Enfría 30 s.' },
+};
+const PERK_ORDER = ['dash'];
+
+// Gadgets: aparatos desplegables. Puedes llevar hasta 2 equipados.
+const GADGETS = {
+  turret:  { name:'Torreta', icon:'🔫',
+             ammo:60, fireCd:0.22, dmg:2, range:320*SC, spd:380*SC, breakWaves:5,
+             desc:'Torreta automática con 60 balas. Al agotarse se rompe y tarda 5 oleadas en volver.' },
+  grenade: { name:'Granada', icon:'💣', max:3, start:1, throwCd:0.6,
+             throwSpd:360*SC, fuse:0.85, radius:96*SC, dmg:16,
+             desc:'Granada explosiva. Ganas 1 al pasar cada oleada (máx 3).' },
+};
+const GADGET_ORDER = ['turret','grenade'];
+const MAX_GADGETS = 2;
+
 // ====================== GUARDADO (persistente) ======================
 const SAVE_KEY = 'pixelZombiesSave_v2';
 const UNLOCK_ALL = true;   // DEV: pon false para volver a la progresion normal (desbloqueo por nivel)
@@ -517,6 +591,12 @@ function loadSave() {
   save.best     = save.best     ?? 0;
   save.map      = save.map      ?? 'snow';
   save.volume   = (typeof save.volume === 'number') ? save.volume : 1;
+  // perk equipado (1) y gadgets equipados (hasta 2)
+  save.perk     = (save.perk === undefined) ? 'dash'
+                  : (save.perk && PERKS[save.perk] ? save.perk : null);
+  save.gadgets  = Array.isArray(save.gadgets)
+                  ? save.gadgets.filter(id => GADGETS[id]).slice(0, MAX_GADGETS)
+                  : ['turret','grenade'];
   if (UNLOCK_ALL) {                                  // DEV: todas las armas disponibles para probar
     save.owned = WEAPON_ORDER.slice();
     save.level = Math.max(save.level, ...WEAPON_ORDER.map(id => WEAPONS[id].unlock));
@@ -605,6 +685,7 @@ const Sfx = {
   bang()    { this.beep({type:'square', f:95, f2:45, dur:0.12, vol:0.35}); this.noise({dur:0.08, vol:0.22, freq:320, filter:'lowpass'}); },
   crash()   { this.noise({dur:0.35, vol:0.55, freq:600, filter:'lowpass'}); this.beep({type:'square', f:150, f2:50, dur:0.28, vol:0.32}); },
   smash()   { this.noise({dur:0.16, vol:0.4, freq:1200, filter:'bandpass', q:0.8}); this.beep({type:'square', f:200, f2:80, dur:0.1, vol:0.18}); },
+  dash()    { this.noise({dur:0.16, vol:0.3, freq:900, filter:'bandpass', q:1.2}); this.beep({type:'sine', f:300, f2:760, dur:0.13, vol:0.18}); },
 };
 Sfx.muted = !!save.muted;
 Sfx.volume = save.volume;
@@ -1396,6 +1477,7 @@ function handleTransitions(){
 
 // ====================== ESTADO ======================
 let player, bullets, zombies, particles, decals, pickups, spits, shocks, keys, mouse;
+let turret, grenades;   // gadgets desplegados en el mapa
 let wave, score, spawnTimer, betweenWaves, pickupTimer, killsThisWave;
 let waveTotal, waveSpawned;   // zombies totales de la oleada y cuántos van spawneados
 let shake, running, paused, last;
@@ -1412,6 +1494,8 @@ function reset() {
   player = { x:W/2, y:H/2, r:5*SC, speed:74*SC, hp:100, maxHp:100,
              ang:0, reloading:0, fireCd:0, hurtFlash:0, knifeCd:0, meleeFx:0, transCd:0.4,
              stamina:100, maxStamina:100, exhausted:false, blind:0, blindSplats:[],
+             dashCd:0, dashTime:0, dashDir:0, gadgetCd:{ grenade:0 }, turretBrokenWave:0,
+             grenadeCount:GADGETS.grenade.start,
              mags:{}, res:{}, curId:save.equipped };
   for (const id of save.owned) ensureWeaponState(id);
   ensureWeaponState(save.equipped);
@@ -1420,6 +1504,7 @@ function reset() {
   buildWorld();
   zombies = curRegion.zombies; pickups = curRegion.pickups; decals = curRegion.decals;
   bullets=[]; particles=[]; spits=[]; shocks=[]; keys={};
+  turret=null; grenades=[];
   const start = freeCellNear(W/2, H/2);
   player.x = start.x; player.y = start.y;
   mouse={ x:W/2, y:0, down:false };
@@ -1655,7 +1740,12 @@ addEventListener('keydown', e => {
   keys[k] = true;
   if (e.key === 'Escape') { togglePause(); return; }
   if (k === 'm') { Sfx.setMuted(!Sfx.muted); save.muted = Sfx.muted; persist(); toast(Sfx.muted ? '🔇 Silencio' : '🔊 Sonido'); return; }
-  if (running && !paused && k === 'r') reload();
+  if (running && !paused) {
+    if (k === 'r') reload();
+    else if (k === ' ') { e.preventDefault(); tryDash(); }   // Dash
+    else if (k === 'q') useGadget(0);                         // Gadget 1
+    else if (k === 'e') useGadget(1);                         // Gadget 2
+  }
 });
 addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
 cv.addEventListener('mousemove', e => {
@@ -1747,7 +1837,8 @@ if (IS_TOUCH) {
   const help = document.querySelector('#menu p[style]');
   if (help) help.innerHTML =
     '<span class="key">Joystick izq.</span> moverse · <span class="key">Joystick der.</span> apuntar y disparar · ' +
-    'botones <span class="key">&#10227;</span> recargar · <span class="key">&#187;</span> correr · <span class="key">II</span> pausa';
+    'botones <span class="key">&#10227;</span> recargar · <span class="key">&#187;</span> correr · <span class="key">II</span> pausa · ' +
+    'toca las habilidades (perk y gadgets) abajo en el centro';
 }
 
 function reload() {
@@ -1781,6 +1872,113 @@ function melee() {
   const fx = player.x + Math.cos(player.ang)*KNIFE.range;
   const fy = player.y + Math.sin(player.ang)*KNIFE.range;
   damageProp(fx, fy, KNIFE.dmg);
+}
+
+// ---- DASH (perk) ----
+function tryDash() {
+  if (save.perk !== 'dash') return;
+  if (player.dashCd > 0 || player.dashTime > 0) return;
+  const p = PERKS.dash;
+  player.dashTime = p.dur;
+  player.dashCd = p.cd;
+  player.dashDir = player.ang;   // dirección a la que estás apuntando
+  Sfx.dash();
+  shake = Math.min(shake + 2, 8);
+}
+
+// ---- GADGETS ----
+function useGadget(slot) {
+  const id = save.gadgets[slot];
+  if (!id) return;
+  if (id === 'turret') deployTurret();
+  else if (id === 'grenade') throwGrenade();
+}
+function deployTurret() {
+  const g = GADGETS.turret;
+  if (turret) { toast('La torreta ya está desplegada'); return; }
+  if (wave < player.turretBrokenWave) {
+    toast(`Torreta rota · vuelve en la oleada ${player.turretBrokenWave}`); Sfx.empty(); return;
+  }
+  turret = { x:player.x, y:player.y, ammo:g.ammo, ang:player.ang, fireCd:0 };
+  Sfx.equip(); toast('Torreta desplegada');
+}
+function throwGrenade() {
+  const g = GADGETS.grenade;
+  if (player.gadgetCd.grenade > 0) return;          // pequeño retardo entre lanzamientos
+  if (player.grenadeCount <= 0) { toast('Sin granadas'); Sfx.empty(); return; }
+  player.grenadeCount--;
+  player.gadgetCd.grenade = g.throwCd;
+  grenades.push({ x:player.x + Math.cos(player.ang)*12*SC, y:player.y + Math.sin(player.ang)*12*SC,
+                  vx:Math.cos(player.ang)*g.throwSpd, vy:Math.sin(player.ang)*g.throwSpd,
+                  fuse:g.fuse, t:0, dead:false });
+  Sfx.bang();
+}
+
+// actualiza torreta, granadas y enfriamientos de habilidades
+function updateGadgets(dt) {
+  if (player.dashCd > 0) player.dashCd -= dt;
+  if (player.gadgetCd.grenade > 0) player.gadgetCd.grenade -= dt;
+
+  // TORRETA: apunta al zombie vivo más cercano en rango y dispara hasta agotar balas
+  if (turret) {
+    turret.fireCd -= dt;
+    let best=null, bd=GADGETS.turret.range;
+    for (const z of zombies) {
+      if (z.hp <= 0) continue;
+      const d = Math.hypot(z.x-turret.x, z.y-turret.y);
+      if (d < bd) { bd = d; best = z; }
+    }
+    if (best) {
+      turret.ang = Math.atan2(best.y-turret.y, best.x-turret.x);
+      if (turret.fireCd <= 0) {
+        turret.fireCd = GADGETS.turret.fireCd;
+        const a = turret.ang + (Math.random()-0.5)*0.06;
+        bullets.push({ x:turret.x+Math.cos(turret.ang)*9*SC, y:turret.y+Math.sin(turret.ang)*9*SC,
+          vx:Math.cos(a)*GADGETS.turret.spd, vy:Math.sin(a)*GADGETS.turret.spd,
+          life:GADGETS.turret.range/GADGETS.turret.spd, dmg:GADGETS.turret.dmg, pierce:0, hits:[] });
+        turret.ammo--;
+        Sfx.gun('smg');
+        if (turret.ammo <= 0) {   // se acaban las balas: la torreta se rompe
+          turret = null;
+          player.turretBrokenWave = wave + GADGETS.turret.breakWaves;
+          Sfx.smash();
+          toast(`¡Torreta rota! Vuelve en la oleada ${player.turretBrokenWave}`);
+        }
+      }
+    }
+  }
+
+  // GRANADAS: vuelan, ruedan con fricción y explotan al acabarse la mecha
+  for (const g of grenades) {
+    g.t += dt; g.fuse -= dt;
+    const nx = g.x + g.vx*dt, ny = g.y + g.vy*dt;
+    if (solidAt(nx, ny)) { g.vx = g.vy = 0; }   // choca con pared: se queda
+    else { g.x = nx; g.y = ny; }
+    g.vx *= 0.90; g.vy *= 0.90;
+    if (g.fuse <= 0) { explodeAt(g.x, g.y, GADGETS.grenade.radius, GADGETS.grenade.dmg); g.dead = true; }
+  }
+  grenades = grenades.filter(g => !g.dead);
+}
+
+// explosión en área: daña zombies con caída por distancia + efecto visual
+function explodeAt(x, y, radius, dmg) {
+  shake = Math.min(shake + 7, 10);
+  Sfx.crash();
+  shocks.push({ x, y, age:0, dur:0.4, maxR:radius, col:'255,150,60' });
+  for (let i=0;i<26;i++){ const a=Math.random()*Math.PI*2, sp=(40+Math.random()*160)*SC;
+    particles.push({ x, y, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp, life:0.3+Math.random()*0.4,
+      col:Math.random()<0.5?'#ffce4a':'#e2754f', size:(2+(Math.random()*2|0))*SC }); }
+  for (const z of zombies) {
+    if (z.hp <= 0) continue;
+    const d = Math.hypot(z.x-x, z.y-y), reach = radius + z.r;
+    if (d < reach) {
+      const dd = Math.max(1, Math.round(dmg * (1 - d/reach)));
+      z.hp -= dd; z.hitFlash = 0.12;
+      bloodBurst(z.x, z.y, z.x-x, z.y-y, z.hp<=0 ? 14 : 6);
+      if (z.hp <= 0) { gainKill(z); decals.push({ x:z.x, y:z.y }); }
+    }
+  }
+  damageProp(x, y, 30);   // rompe cajas cercanas
 }
 
 function shoot() {
@@ -1851,6 +2049,9 @@ function advanceWave() {
   const bonus = 15 + next*6;
   save.money += bonus; addXp(8 + next*2);
   switchWindow = 10;   // 10 s de descanso para cambiar de arma en el arsenal
+  // recompensa de gadget: +1 granada por oleada superada (si está equipada), hasta el tope
+  if (save.gadgets.includes('grenade'))
+    player.grenadeCount = Math.min(GADGETS.grenade.max, player.grenadeCount + 1);
   startWave(next);
   Sfx.wave();
   toast(isBossWave(next) ? `¡Oleada ${next}! Se acerca un JEFE` : `¡Oleada ${next}! Cambia de arma (10s)`);
@@ -1889,7 +2090,7 @@ function update(dt) {
     player.stamina = Math.min(player.maxStamina, player.stamina + 22*dt);
     if (player.exhausted && player.stamina >= 30) player.exhausted = false;
   }
-  const run = running ? 1.55 : 1;
+  const run = running ? 1.25 : 1;   // correr es más moderado: el dash gana sentido
   const sf = document.getElementById('staFill');
   sf.style.width = (player.stamina/player.maxStamina*100)+'%';
   sf.style.background = player.exhausted ? '#e2754f' : (running ? '#ffd24a' : '#6fe26f');
@@ -1898,6 +2099,14 @@ function update(dt) {
   const mvx = (dx/len)*player.speed*run*slow*dt;
   const mvy = (dy/len)*player.speed*run*slow*dt;
   moveCollide(player, player.x+mvx, player.y+mvy);   // colisión con edificios/obstáculos
+  // dash (perk): impulso adicional en la dirección capturada al activarlo
+  if (player.dashTime > 0) {
+    moveCollide(player, player.x + Math.cos(player.dashDir)*PERKS.dash.speed*dt,
+                        player.y + Math.sin(player.dashDir)*PERKS.dash.speed*dt);
+    player.dashTime -= dt;
+    particles.push({ x:player.x, y:player.y, vx:0, vy:0, life:0.2, col:'#8fd3ff', size:3*SC });
+  }
+  updateGadgets(dt);
   if (player.transCd > 0) player.transCd -= dt;
   handleTransitions();                                // cambio de región / puertas
   if (touchInput.aimActive) player.ang = Math.atan2(touchInput.aimY, touchInput.aimX);  // joystick movil
@@ -2073,6 +2282,8 @@ function update(dt) {
     sm.classList.remove('hidden');
     document.getElementById('swTime').textContent = `DESCANSO · ${Math.ceil(switchWindow)}s`;
   } else sm.classList.add('hidden');
+
+  updateAbilityBar();
 }
 
 function bloodBurst(x, y, vx, vy, n) {
@@ -2132,6 +2343,9 @@ function draw() {
   // cajas/contenedores destructibles
   for (const p of curRegion.props) if (p.alive) drawProp(p);
 
+  // torreta desplegada
+  if (turret) drawTurret();
+
   // puerta del interior bajo asedio
   if (curRegion.kind === 'room') drawRoomDoor();
 
@@ -2145,7 +2359,7 @@ function draw() {
   // ondas expansivas del pisotón
   for (const sh of shocks) {
     const f = sh.age/sh.dur;
-    ctx.strokeStyle = `rgba(210,170,120,${(1-f)*0.8})`;
+    ctx.strokeStyle = `rgba(${sh.col||'210,170,120'},${(1-f)*0.8})`;
     ctx.lineWidth = 4*SC;
     ctx.beginPath(); ctx.arc(sh.x, sh.y, sh.maxR*f, 0, 7); ctx.stroke();
   }
@@ -2206,6 +2420,14 @@ function draw() {
       ctx.fillStyle = '#8fd14a'; ctx.fillRect(s.x-2*SC, s.y-2*SC, 4*SC, 4*SC);
       ctx.fillStyle = '#cdee8a'; ctx.fillRect(s.x-SC, s.y-SC, 2*SC, 2*SC);
     }
+  }
+
+  // granadas activas (parpadean al acercarse la explosión)
+  for (const g of grenades) {
+    const blink = g.fuse < 0.4 && (Math.floor(g.t*20)%2);
+    ctx.fillStyle = '#14161b'; ctx.fillRect(g.x-4*SC, g.y-4*SC, 8*SC, 8*SC);
+    ctx.fillStyle = blink ? '#ff5a3c' : '#2f6d2f'; ctx.fillRect(g.x-3*SC, g.y-3*SC, 6*SC, 6*SC);
+    ctx.fillStyle = '#1a3a1a'; ctx.fillRect(g.x-SC, g.y-5*SC, 2*SC, 2*SC);   // espoleta
   }
 
   for (const z of zombies) if (z.hp < z.maxHp && !z.isBoss) {
@@ -2273,6 +2495,25 @@ function drawRoomDoor() {
     ctx.fillStyle='#5a3a1c'; ctx.fillRect(x0, y0, 4*SC, h); ctx.fillRect(x0+w-4*SC, y0, 4*SC, h);
     ctx.fillStyle='#6e4a26'; ctx.fillRect(x0, y0, w, 3*SC);
   }
+}
+
+function drawTurret() {
+  const x = Math.round(turret.x), y = Math.round(turret.y);
+  ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(x-8*SC, y+5*SC, 16*SC, 3*SC);   // sombra
+  // base
+  ctx.fillStyle = '#14161b'; ctx.fillRect(x-7*SC, y-7*SC, 14*SC, 14*SC);
+  ctx.fillStyle = '#39414b'; ctx.fillRect(x-6*SC, y-6*SC, 12*SC, 12*SC);
+  ctx.fillStyle = '#2a3038'; ctx.fillRect(x-4*SC, y-4*SC, 8*SC, 8*SC);
+  // cañón orientado al objetivo
+  ctx.save(); ctx.translate(x, y); ctx.rotate(turret.ang);
+  ctx.fillStyle = '#14161b'; ctx.fillRect(2*SC, -2*SC, 11*SC, 4*SC);
+  ctx.fillStyle = '#5a636e'; ctx.fillRect(3*SC, -SC, 9*SC, 2*SC);
+  ctx.restore();
+  // cúpula / sensor
+  ctx.fillStyle = '#9fe6ff'; ctx.fillRect(x-SC, y-SC, 2*SC, 2*SC);
+  // munición restante
+  ctx.fillStyle = '#000'; ctx.fillRect(x-8*SC, y-13*SC, 16*SC, 4*SC);
+  ctx.fillStyle = '#6fe26f'; ctx.fillRect(x-8*SC+SC, y-13*SC+SC, (16*SC-2*SC)*(turret.ammo/GADGETS.turret.ammo), 2*SC);
 }
 
 function drawPickup(type, x, y) {
@@ -2448,9 +2689,19 @@ function weaponIcon(wp) {
   return c.toDataURL();
 }
 
+let shopTab = 'weapons';
 function renderShop() {
   document.getElementById('shopMoney').textContent = save.money;
   document.getElementById('shopLevel').textContent = save.level;
+  document.querySelectorAll('.shop-tab').forEach(b => b.classList.toggle('on', b.dataset.tab === shopTab));
+  if (shopTab === 'perks')   return renderPerks();
+  if (shopTab === 'gadgets') return renderGadgets();
+  renderWeapons();
+}
+document.querySelectorAll('.shop-tab').forEach(b =>
+  b.addEventListener('click', () => { shopTab = b.dataset.tab; Sfx.equip(); renderShop(); }));
+
+function renderWeapons() {
   const grid = document.getElementById('shopGrid');
   grid.innerHTML = '';
   for (const id of WEAPON_ORDER) {
@@ -2484,6 +2735,130 @@ function renderShop() {
     btn.addEventListener('click', () => buyWeapon(btn.dataset.buy)));
   grid.querySelectorAll('[data-equip]').forEach(btn =>
     btn.addEventListener('click', () => equipWeapon(btn.dataset.equip)));
+}
+
+// ---- PERKS (solo 1 equipado) ----
+function renderPerks() {
+  const grid = document.getElementById('shopGrid');
+  grid.innerHTML = '';
+  for (const id of PERK_ORDER) {
+    const pk = PERKS[id];
+    const equipped = save.perk === id;
+    const card = document.createElement('div');
+    card.className = 'card' + (equipped ? ' equipped' : '');
+    card.innerHTML = `
+      <div class="nm">${pk.name} ${equipped?'<span class="tag">★</span>':''}</div>
+      <div class="ico" style="font-size:38px;line-height:1;text-align:center">${pk.icon}</div>
+      <div class="stats">${pk.desc}<br>Enfriamiento <span>${pk.cd}s</span></div>
+      ${equipped ? `<button class="act owned" data-unperk="${id}">✔ EQUIPADO</button>`
+                 : `<button class="act equip" data-perk="${id}">EQUIPAR</button>`}`;
+    grid.appendChild(card);
+  }
+  grid.querySelectorAll('[data-perk]').forEach(b => b.addEventListener('click', () => equipPerk(b.dataset.perk)));
+  grid.querySelectorAll('[data-unperk]').forEach(b => b.addEventListener('click', () => {
+    save.perk = null; persist(); Sfx.equip(); buildAbilityBar(); renderPerks();
+  }));
+  const note = document.createElement('div');
+  note.className = 'small'; note.style.gridColumn = '1/-1';
+  note.textContent = 'Solo puedes llevar 1 perk equipado.';
+  grid.appendChild(note);
+}
+function equipPerk(id) {
+  if (!PERKS[id]) return;
+  save.perk = id; persist(); Sfx.equip(); toast(`Perk: ${PERKS[id].name}`);
+  buildAbilityBar(); renderPerks();
+}
+
+// ---- GADGETS (hasta 2 equipados) ----
+function renderGadgets() {
+  const grid = document.getElementById('shopGrid');
+  grid.innerHTML = '';
+  for (const id of GADGET_ORDER) {
+    const gd = GADGETS[id];
+    const equipped = save.gadgets.includes(id);
+    let extra = '';
+    if (id === 'turret')  extra = `<br>Balas <span>${gd.ammo}</span> · Daño <span>${gd.dmg}</span>`;
+    if (id === 'grenade') extra = `<br>Daño <span>${gd.dmg}</span> · +1/oleada · Máx <span>${gd.max}</span>`;
+    const card = document.createElement('div');
+    card.className = 'card' + (equipped ? ' equipped' : '');
+    card.innerHTML = `
+      <div class="nm">${gd.name} ${equipped?'<span class="tag">★</span>':''}</div>
+      <div class="ico" style="font-size:38px;line-height:1;text-align:center">${gd.icon}</div>
+      <div class="stats">${gd.desc}${extra}</div>
+      ${equipped ? `<button class="act owned" data-ungad="${id}">✔ EQUIPADO</button>`
+                 : `<button class="act equip" data-gad="${id}">EQUIPAR</button>`}`;
+    grid.appendChild(card);
+  }
+  grid.querySelectorAll('[data-gad]').forEach(b => b.addEventListener('click', () => equipGadget(b.dataset.gad)));
+  grid.querySelectorAll('[data-ungad]').forEach(b => b.addEventListener('click', () => unequipGadget(b.dataset.ungad)));
+  const note = document.createElement('div');
+  note.className = 'small'; note.style.gridColumn = '1/-1';
+  note.textContent = `Puedes equipar hasta ${MAX_GADGETS} gadgets (${save.gadgets.length}/${MAX_GADGETS}).`;
+  grid.appendChild(note);
+}
+function equipGadget(id) {
+  if (!GADGETS[id] || save.gadgets.includes(id)) return;
+  if (save.gadgets.length >= MAX_GADGETS) { toast(`Solo ${MAX_GADGETS} gadgets a la vez`); Sfx.empty(); return; }
+  save.gadgets.push(id); persist(); Sfx.equip(); toast(`Gadget: ${GADGETS[id].name}`);
+  buildAbilityBar(); renderGadgets();
+}
+function unequipGadget(id) {
+  save.gadgets = save.gadgets.filter(g => g !== id); persist(); Sfx.equip();
+  buildAbilityBar(); renderGadgets();
+}
+
+// ====================== BARRA DE HABILIDADES ======================
+const abilityBar = document.getElementById('abilityBar');
+function buildAbilityBar() {
+  abilityBar.innerHTML = '';
+  const slots = [];
+  if (save.perk && PERKS[save.perk]) slots.push({ kind:'perk', slot:0, key:'␣', def:PERKS[save.perk] });
+  save.gadgets.forEach((id, i) => { if (GADGETS[id]) slots.push({ kind:'gadget', slot:i, key:(i===0?'Q':'E'), def:GADGETS[id] }); });
+  for (const s of slots) {
+    const el = document.createElement('div');
+    el.className = 'abil'; el.dataset.kind = s.kind; el.dataset.slot = s.slot;
+    el.innerHTML = `<span class="abil-key">${s.key}</span><span class="abil-ico">${s.def.icon}</span>`
+      + `<i class="abil-cd"></i><span class="abil-info"></span>`;
+    abilityBar.appendChild(el);
+  }
+  abilityBar.classList.toggle('hidden', slots.length === 0 || !running);
+}
+abilityBar.addEventListener('pointerdown', e => {
+  const el = e.target.closest('.abil'); if (!el) return;
+  e.preventDefault(); e.stopPropagation();
+  Sfx.unlock();
+  if (!running || paused) return;
+  if (el.dataset.kind === 'perk') tryDash();
+  else useGadget(+el.dataset.slot);
+});
+function updateAbilityBar() {
+  if (abilityBar.classList.contains('hidden')) return;
+  for (const el of abilityBar.children) {
+    const cd = el.querySelector('.abil-cd');
+    const info = el.querySelector('.abil-info');
+    if (el.dataset.kind === 'perk') {
+      const frac = player.dashCd > 0 ? player.dashCd/PERKS.dash.cd : 0;
+      cd.style.height = (frac*100) + '%';
+      info.textContent = player.dashCd > 0 ? Math.ceil(player.dashCd) : '';
+      el.classList.toggle('ready', player.dashCd <= 0);
+      el.classList.remove('broken');
+    } else {
+      const id = save.gadgets[+el.dataset.slot];
+      if (id === 'turret') {
+        const broken = wave < player.turretBrokenWave;
+        cd.style.height = broken ? '100%' : '0%';
+        info.textContent = turret ? turret.ammo : (broken ? player.turretBrokenWave : '');
+        el.classList.toggle('broken', broken);
+        el.classList.toggle('ready', !broken && !turret);
+      } else if (id === 'grenade') {
+        const frac = player.gadgetCd.grenade > 0 ? player.gadgetCd.grenade/GADGETS.grenade.throwCd : 0;
+        cd.style.height = (frac*100) + '%';                 // breve retardo entre lanzamientos
+        info.textContent = '×' + player.grenadeCount;       // granadas disponibles
+        el.classList.toggle('ready', player.grenadeCount > 0);
+        el.classList.remove('broken');
+      }
+    }
+  }
 }
 
 // solo se puede cambiar de arma fuera de partida o en la ventana entre oleadas
@@ -2579,6 +2954,7 @@ function startGame() {
   elShop.classList.add('hidden');
   hud.classList.remove('hidden');
   if (IS_TOUCH) elTouch.classList.remove('hidden');
+  buildAbilityBar();
   updateHud();
   last = performance.now();
   requestAnimationFrame(loop);
@@ -2589,6 +2965,7 @@ function gameOver() {
   if (score > save.best) save.best = score;
   persist();
   hud.classList.add('hidden');
+  abilityBar.classList.add('hidden');
   elTouch.classList.add('hidden'); resetTouch();
   elMenu.classList.remove('hidden');
   document.getElementById('menuTitle')?.remove();
@@ -2629,6 +3006,7 @@ document.getElementById('quitBtn').addEventListener('click', () => {
   running = false; paused = false;
   elPause.classList.add('hidden');
   hud.classList.add('hidden');
+  abilityBar.classList.add('hidden');
   elTouch.classList.add('hidden'); resetTouch();
   elMenu.classList.remove('hidden');
   refreshMenuStats();
