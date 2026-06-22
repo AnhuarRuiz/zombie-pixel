@@ -1230,33 +1230,69 @@ function genStreet(reg) {
   }
 }
 // ---- Edificio con interior dentro de una calle ----
-function addEnterableBuilding(reg, roomId) {
-  const bw=6, bh=4;
-  const bx = 7 + (Math.random()*(GX-14-bw)|0);
-  const by = 5 + (Math.random()*(GY-10-bh)|0);
-  for (let y=by;y<by+bh;y++) for (let x=bx;x<bx+bw;x++) gset(reg,x,y,1);
+function addEnterableBuilding(reg, roomId, theme) {
+  const bw=6, bh=4, my=GY/2, mx=GX/2;
+  const isAvenue=(cx,cy)=>(cy>=my-1&&cy<=my)||(cx>=mx-1&&cx<=mx);
+  let bx=0, by=0, ok=false;
+  for (let t=0;t<100 && !ok;t++){
+    bx = BAND+1 + (Math.random()*(GX-2*BAND-bw-1)|0);
+    by = BAND+1 + (Math.random()*(GY-2*BAND-bh-2)|0);
+    ok=true;
+    // la huella debe estar libre y NO sobre una avenida (no taponar el paso entre zonas)
+    for (let y=by;y<by+bh && ok;y++) for (let x=bx-1;x<=bx+bw;x++){
+      if (x<BAND||x>=GX-BAND||y<BAND||y>=GY-BAND){ ok=false; break; }
+      if (gget(reg,x,y)!==0 || isAvenue(x,y)){ ok=false; break; }
+    }
+    // la fila de delante (donde abre la puerta) debe ser suelo (puede ser calle/avenida)
+    if (ok) for (let x=bx;x<bx+bw;x++){
+      if (by+bh>=GY-BAND || gget(reg,x,by+bh)!==0){ ok=false; break; }
+    }
+  }
+  if (!ok) return;   // sin hueco: esta zona se queda sin edificio accesible
+  for (let y=by;y<by+bh;y++) for (let x=bx;x<bx+bw;x++){ gset(reg,x,y,1); reg.bcol[y*GX+x]=(x+y)%5; }
   const dcx=bx+(bw>>1), dcy=by+bh-1;
   gset(reg,dcx,dcy,3);
+  if (gget(reg,dcx,dcy+1)!==0) gset(reg,dcx,dcy+1,0);   // suelo despejado frente a la puerta
   const room = newRegion(roomId,'room');
-  genRoom(room);
+  genRoom(room, theme);
   world.regions[roomId] = room;
   const streetDoorPx = dcx*CELL+CELL/2, streetDoorPy = (dcy+1)*CELL+CELL/2;
   reg.doors.push({ cx:dcx, cy:dcy, to:roomId, toX:room.exitX, toY:room.exitY-CELL });
   room.doors[0].to = reg.id; room.doors[0].toX = streetDoorPx; room.doors[0].toY = streetDoorPy;
 }
-// ---- Interior (habitación) ----
-function genRoom(room) {
+// ---- Interior (habitación temática con secciones) ----
+function genRoom(room, theme) {
+  room.theme = theme || 'oficina';
+  room.decor = [];
+  room.furnKind = (room.theme==='almacen'||room.theme==='tienda') ? 'shelf'
+                : room.theme==='clinica' ? 'cabinet' : 'desk';
   for (let cy=0;cy<GY;cy++) for (let cx=0;cx<GX;cx++)
     if (cx===0||cy===0||cx===GX-1||cy===GY-1) gset(room,cx,cy,1);
   const dcx=GX>>1, dcy=GY-1;
   gset(room,dcx,dcy,3);
   room.exitX = dcx*CELL+CELL/2; room.exitY = dcy*CELL+CELL/2;
   room.doors.push({ cx:dcx, cy:dcy, to:null, toX:0, toY:0 });
-  const n = 6 + (Math.random()*5|0);   // muebles
-  for (let i=0;i<n;i++){
-    const fx=2+(Math.random()*(GX-6)|0), fy=2+(Math.random()*(GY-6)|0);
-    gset(room,fx,fy,2); gset(room,fx+1,fy,2);
+  // tabique horizontal: vestíbulo (abajo) vs zona principal (arriba), con puerta central
+  const PR = Math.floor(GY*0.46);
+  for (let cx=1;cx<GX-1;cx++) if (cx<dcx-1||cx>dcx+1) gset(room,cx,PR,1);
+  // tabique vertical arriba: dos despachos, con un hueco de puerta amplio
+  const VW = Math.random()<0.5 ? Math.floor(GX*0.34) : Math.floor(GX*0.66);
+  for (let cy=1;cy<PR;cy++) if (cy<2||cy>5) gset(room,VW,cy,1);
+  // mobiliario en filas dejando pasillos (sin taponar pasillo central ni el tabique)
+  for (let cy=2;cy<PR-1;cy+=2) for (let cx=2;cx<GX-2;cx+=3){
+    if (gget(room,cx,cy)!==0) continue;
+    if (Math.abs(cx-dcx)<=1 || cx===VW || cx===VW+1 || cx===VW-1) continue;
+    if (Math.random()<0.66){
+      gset(room,cx,cy,2);
+      if (Math.random()<0.5 && gget(room,cx+1,cy)===0 && cx+1!==VW) gset(room,cx+1,cy,2);
+    }
   }
+  // decor pintado: alfombra y recepción en el vestíbulo, plantas en las esquinas
+  room.decor.push({ type:'rug', x:dcx*CELL+CELL/2, y:(PR+1)*CELL, w:CELL*4, h:CELL*3 });
+  room.decor.push({ type:'reception', x:2*CELL, y:(PR+1)*CELL });   // a un lado del vestíbulo
+  room.decor.push({ type:'plant', x:1.1*CELL, y:1.1*CELL });
+  room.decor.push({ type:'plant', x:(GX-2.1)*CELL, y:1.1*CELL });
+  room.decor.push({ type:'plant', x:1.1*CELL, y:(GY-2.1)*CELL });
 }
 
 // ---- Paletas de la ciudad e interiores ----
@@ -1429,8 +1465,8 @@ function buildProps(reg){
   reg.props = [];
   for (let cy=0;cy<GY;cy++) for (let cx=0;cx<GX;cx++) if (reg.grid[cy*GX+cx]===2){
     const room = reg.kind==='room';
-    let kind = room?'crate':'container', hp = room?4:8;
-    if (Math.random() < 0.14) { kind='chest'; hp=6; }   // cofre con botín garantizado
+    let kind = room ? (reg.furnKind||'crate') : 'container', hp = room?4:8;
+    if (Math.random() < (room?0.10:0.14)) { kind='chest'; hp=6; }   // cofre con botín garantizado
     reg.props.push({ cx, cy, x:cx*CELL, y:cy*CELL, alive:true, kind, hp, maxHp:hp });
   }
 }
@@ -1447,6 +1483,27 @@ function drawProp(p){
     ctx.fillStyle='#7a5a32'; ctx.fillRect(x+3*SC,y+3*SC,CELL-6*SC,CELL-6*SC);
     ctx.fillStyle='#5e4426'; ctx.fillRect(x+3*SC,y+CELL*0.46,CELL-6*SC,3*SC);
     ctx.fillRect(x+CELL*0.47,y+3*SC,3*SC,CELL-6*SC);
+  } else if (p.kind==='desk'){
+    ctx.fillStyle='#14161b'; ctx.fillRect(x+2*SC,y+CELL*0.4,CELL-4*SC,CELL*0.5);
+    ctx.fillStyle='#5a4632'; ctx.fillRect(x+3*SC,y+CELL*0.42,CELL-6*SC,CELL*0.44);     // tablero
+    ctx.fillStyle='#3a2c1c'; ctx.fillRect(x+3*SC,y+CELL*0.42,CELL-6*SC,3*SC);
+    ctx.fillStyle='#15181d'; ctx.fillRect(x+CELL*0.3,y+CELL*0.16,CELL*0.4,CELL*0.26);  // monitor
+    ctx.fillStyle='#3a6a8a'; ctx.fillRect(x+CELL*0.34,y+CELL*0.2,CELL*0.32,CELL*0.16);
+    ctx.fillStyle='#0d0f12'; ctx.fillRect(x+CELL*0.46,y+CELL*0.42,CELL*0.08,5*SC);
+  } else if (p.kind==='shelf'){
+    ctx.fillStyle='#14161b'; ctx.fillRect(x+2*SC,y+2*SC,CELL-4*SC,CELL-4*SC);
+    ctx.fillStyle='#4a4036'; ctx.fillRect(x+3*SC,y+3*SC,CELL-6*SC,CELL-6*SC);
+    ctx.fillStyle='#2c261f'; ctx.fillRect(x+3*SC,y+CELL*0.32,CELL-6*SC,3*SC);          // baldas
+    ctx.fillRect(x+3*SC,y+CELL*0.62,CELL-6*SC,3*SC);
+    ctx.fillStyle='#7a5a32'; ctx.fillRect(x+5*SC,y+5*SC,CELL*0.3,CELL*0.2);            // cajas
+    ctx.fillStyle='#6a4a8a'; ctx.fillRect(x+CELL*0.55,y+CELL*0.36,CELL*0.3,CELL*0.2);
+    ctx.fillStyle='#3a6a4a'; ctx.fillRect(x+6*SC,y+CELL*0.66,CELL*0.3,CELL*0.18);
+  } else if (p.kind==='cabinet'){
+    ctx.fillStyle='#14161b'; ctx.fillRect(x+3*SC,y+2*SC,CELL-6*SC,CELL-4*SC);
+    ctx.fillStyle='#cdd6dc'; ctx.fillRect(x+4*SC,y+3*SC,CELL-8*SC,CELL-6*SC);
+    ctx.fillStyle='#9fb0bc'; ctx.fillRect(x+4*SC,y+CELL*0.5,CELL-8*SC,2*SC);
+    ctx.fillStyle='#d14b4b'; ctx.fillRect(x+CELL*0.44,y+CELL*0.2,CELL*0.12,CELL*0.3);  // cruz médica
+    ctx.fillRect(x+CELL*0.34,y+CELL*0.3,CELL*0.32,CELL*0.1);
   } else {
     ctx.fillStyle='#14161b'; ctx.fillRect(x+2*SC,y+2*SC,CELL-4*SC,CELL-4*SC);
     ctx.fillStyle='#46603a'; ctx.fillRect(x+4*SC,y+4*SC,CELL-8*SC,CELL-8*SC);
@@ -1505,9 +1562,13 @@ function buildCityWorld() {
     if (gy<GH-1) r.edges.d='c_'+gx+'_'+(gy+1);
   }
   for (const id in world.regions) genStreet(world.regions[id]);
-  addEnterableBuilding(world.regions['c_1_0'], 'room_oficina');
-  addEnterableBuilding(world.regions['c_0_2'], 'room_tienda');
-  addEnterableBuilding(world.regions['c_2_1'], 'room_casa');
+  // edificios accesibles repartidos por la ciudad, cada uno con su tema de interior
+  addEnterableBuilding(world.regions['c_1_0'], 'room_oficina', 'oficina');
+  addEnterableBuilding(world.regions['c_0_2'], 'room_tienda',  'tienda');
+  addEnterableBuilding(world.regions['c_2_1'], 'room_casa',    'casa');
+  addEnterableBuilding(world.regions['c_0_0'], 'room_almacen', 'almacen');
+  addEnterableBuilding(world.regions['c_2_2'], 'room_clinica', 'clinica');
+  addEnterableBuilding(world.regions['c_2_0'], 'room_oficina2','oficina');
   for (const id in world.regions) buildProps(world.regions[id]);
   for (const id in world.regions)
     (world.regions[id].kind==='room' ? paintRoom : paintCity)(world.regions[id]);
@@ -1523,7 +1584,8 @@ function buildFieldWorld() {
 function buildWorld(){ if (save.map==='city') buildCityWorld(); else buildFieldWorld(); }
 
 const REGION_NAMES = {
-  'room_oficina':'Oficina', 'room_tienda':'Tienda', 'room_casa':'Casa',
+  'room_oficina':'Oficina', 'room_oficina2':'Oficina', 'room_tienda':'Tienda',
+  'room_casa':'Casa', 'room_almacen':'Almacén', 'room_clinica':'Clínica',
 };
 function regionLabel(){
   if (REGION_NAMES[curRegion.id]) return REGION_NAMES[curRegion.id];
