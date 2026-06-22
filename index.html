@@ -105,6 +105,10 @@
   .hud-wave b { display:block; font-family: var(--pixel); font-size: clamp(15px,3.2vmin,24px); color: #fff; margin-top: 5px; text-shadow: 2px 2px 0 #000; }
   .hud-count { margin-top: 4px; font-family: var(--ui); font-size: clamp(12px,2.3vmin,16px); letter-spacing:.5px; color:#cdd6de; text-shadow:1px 1px 0 #000; }
   .hud-count b { color: #ff5a4d; }
+  .hud-mod { margin-top: 5px; display:inline-block; font-family: var(--ui); font-weight:700;
+    font-size: clamp(10px,1.9vmin,13px); letter-spacing:.5px; color:#ffd24a;
+    background: rgba(20,16,8,.7); border:1px solid rgba(255,180,60,.5); border-radius:6px;
+    padding: 2px 8px; text-shadow:1px 1px 0 #000; }
   /* Puntos + dinero: junto al nivel, mismo estilo pequeño */
   .hud-stats { display: flex; gap: clamp(8px,2vmin,14px); margin-top: 1px; font-family: var(--ui); }
   .hud-stats span { font-size: clamp(13px,2.4vmin,16px); letter-spacing:.6px; text-transform:uppercase; color:#cdd6de; text-shadow:1px 1px 0 #000; }
@@ -402,6 +406,7 @@
   <div class="hud-top">
     <div class="hud-wave">Oleada<b id="wave">1</b></div>
     <div class="hud-count" id="zCount">🧟 <b id="zLeft">0</b>/<span id="zTotal">0</span></div>
+    <div class="hud-mod hidden" id="hudMod"></div>
   </div>
   <!-- Arma equipada (estilo Free Fire): arriba-derecha -->
   <div class="hud-weapon" id="weaponPanel">
@@ -445,7 +450,7 @@
   <h1>PIXEL ZOMBIES</h1>
   <div class="subtitle">Survival</div>
   <p>
-    Sobrevive a las oleadas en la calle nevada.<br>
+    Sobrevive a las oleadas en la ciudad apocalíptica.<br>
     Mata zombies para ganar <span class="key">dinero</span> y <span class="key">experiencia</span>.<br>
     Sube de nivel para desbloquear armas y cómpralas en el arsenal.
   </p>
@@ -462,6 +467,25 @@
     <button class="btn ghost" id="settingsBtn">AJUSTES</button>
   </div>
   <div id="menuStats" class="small"></div>
+ </div>
+</div>
+
+<!-- ¿Activar modificadores? (al pulsar JUGAR) -->
+<div id="modPrompt" class="screen hidden">
+ <div class="panel">
+  <h2 style="color:#ffd24a">¿OLEADAS CON MODIFICADORES?</h2>
+  <p>
+    Si los activas, cada oleada normal trae una <b>mutación</b> al azar:<br>
+    <span class="key">🧟 Horda</span> · <span class="key">⚡ Frenesí</span> ·
+    <span class="key">🛡️ Coriáceos</span> · <span class="key">🌫️ Niebla</span> ·
+    <span class="key">💰 Botín doble</span><br>
+    Más caos y más riesgo... pero también más recompensa.
+  </p>
+  <div class="row">
+    <button class="btn" id="modYes">SÍ, ACTIVAR</button>
+    <button class="btn alt" id="modNo">NO, NORMAL</button>
+  </div>
+  <button class="btn ghost" id="modCancel" style="margin-top:6px">VOLVER</button>
  </div>
 </div>
 
@@ -492,6 +516,7 @@
     <button class="shop-tab on" data-tab="weapons">ARMAS</button>
     <button class="shop-tab" data-tab="perks">PERKS</button>
     <button class="shop-tab" data-tab="gadgets">GADGETS</button>
+    <button class="shop-tab" data-tab="cosmetics">SKINS</button>
   </div>
   <div class="grid" id="shopGrid"></div>
   <button class="btn ghost" id="shopBack" style="margin-top:6px">VOLVER</button>
@@ -592,14 +617,24 @@ function loadSave() {
   if (!save.owned.includes('pistol')) save.owned.push('pistol');
   save.equipped = WEAPONS[save.equipped] ? save.equipped : 'pistol';
   save.best     = save.best     ?? 0;
-  save.map      = save.map      ?? 'snow';
+  save.map      = save.map      ?? 'city';
+  if (save.map === 'snow') save.map = 'city';   // mapa de nieve retirado
   save.volume   = (typeof save.volume === 'number') ? save.volume : 1;
+  save.modifiers = save.modifiers ?? false;   // preferencia de oleadas con modificadores
   // perk equipado (1) y gadgets equipados (hasta 2)
   save.perk     = (save.perk === undefined) ? 'dash'
                   : (save.perk && PERKS[save.perk] ? save.perk : null);
   save.gadgets  = Array.isArray(save.gadgets)
                   ? save.gadgets.filter(id => GADGETS[id]).slice(0, MAX_GADGETS)
                   : ['turret','grenade'];
+  // cosméticos: skins poseídas y equipadas (siempre incluyen 'default')
+  const ownedCos = (arr) => { arr = Array.isArray(arr) ? arr : []; if (!arr.includes('default')) arr.unshift('default'); return arr; };
+  save.ownedPlayer     = ownedCos(save.ownedPlayer).filter(id => PLAYER_SKINS[id]);
+  save.ownedWeaponSkin = ownedCos(save.ownedWeaponSkin).filter(id => WEAPON_SKINS[id]);
+  save.ownedBullet     = ownedCos(save.ownedBullet).filter(id => BULLET_SKINS[id]);
+  save.skinPlayer = PLAYER_SKINS[save.skinPlayer] ? save.skinPlayer : 'default';
+  save.skinWeapon = WEAPON_SKINS[save.skinWeapon] ? save.skinWeapon : 'default';
+  save.skinBullet = BULLET_SKINS[save.skinBullet] ? save.skinBullet : 'default';
   if (UNLOCK_ALL) {                                  // DEV: todas las armas disponibles para probar
     save.owned = WEAPON_ORDER.slice();
     save.level = Math.max(save.level, ...WEAPON_ORDER.map(id => WEAPONS[id].unlock));
@@ -607,6 +642,35 @@ function loadSave() {
 }
 function persist() { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); }
 function xpForNext(lvl) { return 100 + lvl * lvl * 22; }
+
+// ====================== COSMÉTICOS (skins) ======================
+// Solo datos: cada skin define overrides de paleta (jugador/arma) o colores (balas).
+// 'default' es gratis y siempre lo tienes. Se aplican recoloreando los sprites.
+const PLAYER_SKINS = {
+  default:  { name:'Superviviente', price:0,    pal:{} },
+  crimson:  { name:'Carmesí',       price:700,  pal:{ S:'#b23a2e', s:'#7e2820', R:'#3a1714', e:'#2a100e', J:'#2a201c', j:'#1b1512' } },
+  military: { name:'Militar',       price:900,  pal:{ S:'#566b3a', s:'#3d4e29', R:'#3a3a22', e:'#2a2a18', J:'#39341f', j:'#2a2618' } },
+  arctic:   { name:'Ártico',        price:1100, pal:{ S:'#e6ecf0', s:'#aebccb', R:'#3a6d8f', e:'#2a5070', J:'#cdd5da', j:'#9fb0bb' } },
+  shadow:   { name:'Sombra',        price:1400, pal:{ S:'#2a2d35', s:'#1c1e24', R:'#6a3aa0', e:'#4a2870', J:'#1a1c22', j:'#101216', H:'#1a1c22', h:'#101216' } },
+  gold:     { name:'Dorado',        price:2200, pal:{ S:'#e0b94a', s:'#b8862a', R:'#7a5a12', e:'#5a3f0c', J:'#3a3024', j:'#2a2218' } },
+};
+const WEAPON_SKINS = {
+  default:  { name:'Acero',    price:0,    pal:{} },
+  gold:     { name:'Oro',      price:1000, pal:{ d:'#6a4a10', m:'#a8791f', M:'#e0b94a', h:'#ffe89a' } },
+  crimson:  { name:'Carmesí',  price:1000, pal:{ d:'#3a0f0c', m:'#7a241d', M:'#c1352b', h:'#ff8a6a' } },
+  toxic:    { name:'Tóxico',   price:1200, pal:{ d:'#1a2a10', m:'#3d6b1a', M:'#6f9b3a', h:'#b6e24a' } },
+  cobalt:   { name:'Cobalto',  price:1200, pal:{ d:'#0e1c33', m:'#1f3f6d', M:'#3a6db8', h:'#8fc1ff' } },
+  bone:     { name:'Hueso',    price:1500, pal:{ d:'#3a352a', m:'#7a7060', M:'#cfc6b0', h:'#f0ead6' } },
+};
+const BULLET_SKINS = {
+  default:  { name:'Plomo',   price:0,   edge:'#caa53a', core:'#ffe89a' },
+  plasma:   { name:'Plasma',  price:500, edge:'#2f86c8', core:'#bff0ff' },
+  toxic:    { name:'Tóxico',  price:500, edge:'#5a8a2a', core:'#cdee8a' },
+  ember:    { name:'Brasa',   price:700, edge:'#d2541f', core:'#ffd76a' },
+  crimson:  { name:'Carmesí', price:700, edge:'#a3242a', core:'#ff8a6a' },
+  void:     { name:'Vacío',   price:900, edge:'#6a3aa0', core:'#d9b6ff' },
+};
+
 loadSave();
 
 // ====================== SONIDO (Web Audio, sintetizado) ======================
@@ -740,8 +804,8 @@ const P = {
   t:'#3d5327', T:'#506c33', w:'#e6ecf0',
 };
 
-// Jugador (superviviente)
-const playerSprite = sprite([
+// Jugador (superviviente) — se reconstruye según la skin equipada
+const PLAYER_ROWS = [
   '    HHHH    ',
   '   HhhhhH   ',
   '   HFFFFH   ',
@@ -758,7 +822,13 @@ const playerSprite = sprite([
   '   JJjjJJ   ',
   '   JJ  JJ   ',
   '   BB  BB   ',
-], P);
+];
+function buildPlayerSprite(skinId) {
+  const pal = Object.assign({}, P, (PLAYER_SKINS[skinId || save.skinPlayer] || PLAYER_SKINS.default).pal);
+  return sprite(PLAYER_ROWS, pal);
+}
+let playerSprite = buildPlayerSprite();
+function applyPlayerSkin() { playerSprite = buildPlayerSprite(); }
 // Zombie normal
 const zombieA = sprite([
   '    zzzz    ',
@@ -984,8 +1054,18 @@ const WART = {
   ],
 };
 function padRows(rows) { const w = Math.max(...rows.map(r => r.length)); return rows.map(r => r.padEnd(w, ' ')); }
-function buildGun(rows) { return outline(makeSprite(padRows(rows), GP, SC), '#0b0d10'); }
-for (const id in WART) if (WEAPONS[id]) WEAPONS[id].spr = buildGun(WART[id]);
+function weaponPalette() { return Object.assign({}, GP, (WEAPON_SKINS[save.skinWeapon] || WEAPON_SKINS.default).pal); }
+function buildGun(rows) { return outline(makeSprite(padRows(rows), weaponPalette(), SC), '#0b0d10'); }
+function applyWeaponSkin() { for (const id in WART) if (WEAPONS[id]) WEAPONS[id].spr = buildGun(WART[id]); }
+applyWeaponSkin();   // construye los sprites con la skin guardada
+
+// color de las balas (según skin equipada)
+let bulletEdge = '#caa53a', bulletCore = '#ffe89a';
+function applyBulletSkin() {
+  const b = BULLET_SKINS[save.skinBullet] || BULLET_SKINS.default;
+  bulletEdge = b.edge; bulletCore = b.core;
+}
+applyBulletSkin();
 
 // ====================== MAPAS / FONDO ======================
 const TILE = 16 * SC;
@@ -994,32 +1074,6 @@ const ROWS = Math.ceil(H / TILE);
 let bg = null;
 
 // --- Mapa 1: Calle Nevada ---
-function buildSnow(g) {
-  const roadTop = Math.floor(ROWS * 0.45);
-  const roadBot = Math.floor(ROWS * 0.78);
-  for (let ty = 0; ty < ROWS; ty++)
-    for (let tx = 0; tx < COLS; tx++) {
-      const x = tx*TILE, y = ty*TILE;
-      let base = (ty>=roadTop&&ty<=roadBot) ? '#8b9298' : (ty<roadTop ? '#dfe7ec' : '#e7eef2');
-      g.fillStyle = base; g.fillRect(x, y, TILE, TILE);
-      const seed = (tx*73856093) ^ (ty*19349663);
-      const rnd = ((seed % 100) + 100) % 100;
-      if (ty>=roadTop && ty<=roadBot) {
-        if (rnd<22){ g.fillStyle='#cdd5da'; g.fillRect(x+(rnd%3)*4*SC, y+(rnd%4)*3*SC, 3*SC,3*SC); }
-        if (rnd>80){ g.fillStyle='#7a8086'; g.fillRect(x+2*SC, y+8*SC, 4*SC,2*SC); }
-      } else {
-        if (rnd<14){ g.fillStyle='#b9c6cc'; g.fillRect(x+(rnd%4)*3*SC, y+(rnd%3)*4*SC, 2*SC,2*SC); }
-        if (rnd>92 && ty<roadTop){ g.fillStyle='#9fb36a'; g.fillRect(x+5*SC,y+6*SC,3*SC,3*SC); }
-      }
-    }
-  g.fillStyle='#cdd5da';
-  g.fillRect(0, roadTop*TILE-3*SC, W, 3*SC);
-  g.fillRect(0, (roadBot+1)*TILE, W, 3*SC);
-  g.fillStyle='#d9c24a';
-  const midY = Math.floor((roadTop+roadBot)/2)*TILE + 6*SC;
-  for (let x=0; x<W; x+=28*SC) g.fillRect(x, midY, 14*SC, 3*SC);
-}
-
 // --- helpers para la ciudad (medidas escaladas por SC) ---
 function cityBuilding(g, x, y, w, h) {
   const cols = ['#2c2f36','#34302c','#2e3640','#3a2f2f','#30343a','#262a30'];
@@ -1113,15 +1167,14 @@ function buildCity(g) {
 }
 
 const MAPS = {
-  snow: { name:'Calle Nevada',        build: buildSnow },
   city: { name:'Ciudad Apocalíptica', build: buildCity },
 };
-const MAP_ORDER = ['snow','city'];
+const MAP_ORDER = ['city'];
 
 function buildBackground() {
   const b = document.createElement('canvas');
   b.width = W; b.height = H;
-  (MAPS[save.map] || MAPS.snow).build(b.getContext('2d'));
+  (MAPS[save.map] || MAPS.city).build(b.getContext('2d'));
   bg = b;
 }
 
@@ -1574,14 +1627,7 @@ function buildCityWorld() {
     (world.regions[id].kind==='room' ? paintRoom : paintCity)(world.regions[id]);
   curRegion = world.regions['c_1_1'];
 }
-function buildFieldWorld() {
-  world = { regions:{}, map:'snow' };
-  const r = newRegion('field','field');   // grid vacío (todo suelo)
-  const b=document.createElement('canvas'); b.width=W; b.height=H;
-  buildSnow(b.getContext('2d')); r.bg=b;
-  world.regions['field']=r; curRegion=r;
-}
-function buildWorld(){ if (save.map==='city') buildCityWorld(); else buildFieldWorld(); }
+function buildWorld(){ buildCityWorld(); }
 
 const REGION_NAMES = {
   'room_oficina':'Oficina', 'room_oficina2':'Oficina', 'room_tienda':'Tienda',
@@ -1589,7 +1635,7 @@ const REGION_NAMES = {
 };
 function regionLabel(){
   if (REGION_NAMES[curRegion.id]) return REGION_NAMES[curRegion.id];
-  if (curRegion.kind==='field') return MAPS.snow.name;
+  if (curRegion.kind==='field') return MAPS.city.name;
   const m=curRegion.id.match(/c_(\d)_(\d)/);
   return m ? `Zona ${+m[1]+1}-${+m[2]+1}` : '';
 }
@@ -1600,7 +1646,7 @@ function goRegion(id, x, y){
   if (!world.regions[id]) return;
   curRegion = world.regions[id];
   zombies = curRegion.zombies; pickups = curRegion.pickups; decals = curRegion.decals;
-  bullets=[]; spits=[]; particles=[]; shocks=[];
+  bullets=[]; spits=[]; particles=[]; shocks=[]; pools=[];
   if (curRegion.kind==='room'){ curRegion.doorHP=100; curRegion.broken=false; curRegion.bangCd=0; curRegion.breachCd=0; }
   player.x=x; player.y=y; player.transCd=0.4;
   mouse.down=false;
@@ -1711,7 +1757,7 @@ function handleTransitions(){
 }
 
 // ====================== ESTADO ======================
-let player, bullets, zombies, particles, decals, pickups, spits, shocks, keys, mouse;
+let player, bullets, zombies, particles, decals, pickups, spits, shocks, pools, keys, mouse;
 let turret, grenades;   // gadgets desplegados en el mapa
 let migrateCd;          // temporizador de entrada de zombies rezagados de otras zonas
 let wave, score, spawnTimer, betweenWaves, pickupTimer, killsThisWave;
@@ -1739,12 +1785,12 @@ function reset() {
   player.reserve = player.res[save.equipped];
   buildWorld();
   zombies = curRegion.zombies; pickups = curRegion.pickups; decals = curRegion.decals;
-  bullets=[]; particles=[]; spits=[]; shocks=[]; keys={};
+  bullets=[]; particles=[]; spits=[]; shocks=[]; pools=[]; keys={};
   turret=null; grenades=[]; migrateCd=0;
   const start = freeCellNear(W/2, H/2);
   player.x = start.x; player.y = start.y;
   mouse={ x:W/2, y:0, down:false };
-  wave=1; score=0; shake=0;
+  wave=1; score=0; shake=0; bossRotation=0;
   betweenWaves=false; spawnTimer=0; pickupTimer=8; switchWindow=0;
   startWave(1);
   running=true; paused=false;
@@ -1756,18 +1802,66 @@ function waveSize(w) { return 8 + w*4; }   // oleada 1=12, 5=28, 10=48...
 // cada 5 oleadas aparece un jefe
 function isBossWave(w) { return w > 0 && w % 5 === 0; }
 
-// recompensa del jefe (escala con la oleada en spawnBoss)
-const BOSS = { id:'boss', score:300, cash:120, xp:90, blood:'#6e1f1f', boss:true };
+// ====================== JEFES ======================
+// 3 jefes con identidad propia; rotan en cada oleada de jefe (5, 10, 15...).
+// Todos son AGRESIVOS: telegrafías cortas, encadenan ataques y entran en FURIA al 35% de vida.
+const BOSSES = {
+  // EL COLOSO: tanque enorme. Embiste en cadena, pisotea (AoE) y dispara escombros.
+  colossus: { id:'boss', kind:'colossus', name:'EL COLOSO', boss:true,
+    sprite:zombieTank, scale:2.3, r:18, blood:'#6e1f1f',
+    score:300, cash:120, xp:90, dmg:24, maxChain:2,
+    hp:w=>Math.round(190+w*58), speed:w=>(15+w*0.35)*SC, slamR:w=>(80+w*2.5)*SC },
+  // LA MADRE TÓXICA: ágil y a distancia. Anillos de ácido, charcos tóxicos,
+  // parpadea para flanquearte e invoca escupidores.
+  plague:   { id:'boss', kind:'plague', name:'LA MADRE TÓXICA', boss:true,
+    sprite:zombieBoomer, scale:2.15, r:16, blood:'#5a8a2a',
+    score:340, cash:135, xp:105, dmg:18, maxChain:1,
+    hp:w=>Math.round(150+w*50), speed:w=>(24+w*0.45)*SC, slamR:w=>(70+w*2)*SC },
+  // EL CARNICERO: veloz y feroz. Combos de embestida, salto con impacto y giro cortante.
+  butcher:  { id:'boss', kind:'butcher', name:'EL CARNICERO', boss:true,
+    sprite:zombieRun, scale:2.0, r:13, blood:'#b22b2b',
+    score:360, cash:140, xp:110, dmg:20, maxChain:4,
+    hp:w=>Math.round(140+w*46), speed:w=>(32+w*0.6)*SC, slamR:w=>(64+w*1.8)*SC },
+};
+const BOSS_ORDER = ['colossus','plague','butcher'];
+let bossRotation = 0;   // qué jefe toca en la siguiente oleada de jefe
+
+// ====================== MODIFICADORES DE OLEADA ======================
+// Opcionales (el jugador decide al pulsar JUGAR). Cada oleada normal recibe una mutación.
+const WAVE_MODS = {
+  horde:  { name:'HORDA',     icon:'🧟', desc:'Vienen muchos más',   sizeMul:1.6 },
+  frenzy: { name:'FRENESÍ',   icon:'⚡', desc:'Zombies muy veloces', spdMul:1.45 },
+  tough:  { name:'CORIÁCEOS', icon:'🛡️', desc:'Aguantan más balas',  hpMul:1.7 },
+  fog:    { name:'NIEBLA',    icon:'🌫️', desc:'Visión reducida',     fog:true },
+  bounty: { name:'BOTÍN',     icon:'💰', desc:'Doble dinero y XP',   rewardMul:2, sizeMul:1.2 },
+};
+const WAVE_MOD_ORDER = Object.keys(WAVE_MODS);
+let modifiersOn = false;   // ¿activó el jugador las mutaciones?
+let curMod = null;         // mutación de la oleada actual (o null)
+
+function pickWaveMod() {
+  const id = WAVE_MOD_ORDER[Math.floor(Math.random()*WAVE_MOD_ORDER.length)];
+  return Object.assign({ id }, WAVE_MODS[id]);
+}
+function updateModHud() {
+  const el = document.getElementById('hudMod');
+  if (!el) return;
+  if (curMod) { el.textContent = `${curMod.icon} ${curMod.name}`; el.classList.remove('hidden'); }
+  else el.classList.add('hidden');
+}
 
 // arranca una oleada nueva: fija el cupo de zombies y reinicia contadores
 function startWave(w) {
   wave = w;
-  waveTotal = waveSize(w);
+  bossWaveOn = isBossWave(w);
+  // mutación: solo en oleadas normales a partir de la 2 (la 1 es de calentamiento)
+  curMod = (modifiersOn && !bossWaveOn && w >= 2) ? pickWaveMod() : null;
+  waveTotal = Math.round(waveSize(w) * (curMod?.sizeMul || 1));
   waveSpawned = 0;
   killsThisWave = 0;
   spawnTimer = 0;
-  bossWaveOn = isBossWave(w);
   bossSpawned = false;
+  updateModHud();
 }
 
 // elige tipo de zombie según la oleada (más variedad y peligro en fases avanzadas)
@@ -1821,45 +1915,52 @@ function spawnZombie(fromWave) {
 
 // crea el JEFE de la oleada: enorme, mucha vida y barra propia. No cuenta para el cupo.
 function spawnBoss() {
+  const def = BOSSES[BOSS_ORDER[bossRotation % BOSS_ORDER.length]];
+  bossRotation++;
   const p = pickSpawnPos() || { x:W/2, y:60*SC };
-  const hp = Math.round(180 + wave*55);
+  const hp = def.hp(wave);
   zombies.push({
-    x:p.x, y:p.y, r:18*SC, type:BOSS, isBoss:true, scale:2.3,
-    speed:(15 + wave*0.35)*SC,
-    hp, maxHp:hp, dmg:24, sprite:zombieTank,
+    x:p.x, y:p.y, r:def.r*SC, type:def, kind:def.kind, isBoss:true, scale:def.scale,
+    bossName:def.name, speed:def.speed(wave),
+    hp, maxHp:hp, dmg:def.dmg, sprite:def.sprite,
     ang:0, wob:Math.random()*Math.PI*2, hitFlash:0, atkCd:0, shootCd:0,
     fromWave:false,
-    state:'walk', stateT:0, cAng:0, abilityCd:2 + Math.random()*1.5,   // IA: embestida / invocar / ráfaga / pisotón
-    slamR:(80 + wave*2.5)*SC,
+    state:'walk', stateT:0, cAng:0, chain:0, maxChain:def.maxChain,
+    abilityCd:1.4 + Math.random()*1.2, spinHitCd:0,
+    slamR:def.slamR(wave),
   });
+  toast(`☠ ${def.name}`);
 }
 
 const BOSS_TELE = 0.4;   // aviso de embestida (corto = agresiva)
 
-// cooldown entre habilidades: más corto con la oleada y en furia
-function bossCd(enraged) {
-  const base = (enraged ? 1.6 : 3.0) - wave*0.05;
-  return Math.max(0.9, base) + Math.random()*1.4;
+// cooldown entre habilidades: más corto con la oleada, en furia y según el jefe
+function bossCd(enraged, z) {
+  let base = (enraged ? 1.6 : 3.0) - wave*0.05;
+  if (z && z.kind === 'butcher') base -= 0.6;        // el carnicero no te da respiro
+  else if (z && z.kind === 'plague') base -= 0.25;
+  return Math.max(0.7, base) + Math.random()*1.2;
 }
 
-// IA del jefe: camina, embiste, lanza ráfagas, pisotea (AoE) e invoca refuerzos.
-// Por debajo del 35% de vida entra en FURIA: más rápido y más frecuente.
+// IA del jefe: cada tipo elige de su propio repertorio. Estados de ejecución compartidos
+// (embestida, pisotón, salto, giro). Por debajo del 35% de vida entra en FURIA.
 function updateBoss(z, dt, a, d) {
   z.abilityCd -= dt;
   const enraged = z.hp < z.maxHp*0.35;
   const spd = z.speed * (enraged ? 1.4 : 1);
-  if (enraged && !z.enr) { z.enr = true; toast('¡El jefe está FURIOSO!'); }
+  if (enraged && !z.enr) { z.enr = true; toast(`¡${z.bossName} está FURIOSO!`); }
 
+  // ---------- estados de ejecución (compartidos) ----------
   if (z.state === 'charge') {
     z.stateT -= dt;
     const px = z.x, py = z.y;
     moveCollide(z, z.x + Math.cos(z.cAng)*spd*13*dt, z.y + Math.sin(z.cAng)*spd*13*dt);   // embestida muy rápida
-    particles.push({ x:z.x, y:z.y, vx:(Math.random()-0.5)*80*SC, vy:(Math.random()-0.5)*80*SC, life:0.3, col:'#6b6b6b', size:2*SC });
+    particles.push({ x:z.x, y:z.y, vx:(Math.random()-0.5)*80*SC, vy:(Math.random()-0.5)*80*SC, life:0.3, col:z.type.blood, size:2*SC });
     if (z.stateT <= 0 || (Math.abs(z.x-px) < 0.4 && Math.abs(z.y-py) < 0.4)) {
       shake = Math.min(shake+5, 11);
-      // encadena hasta 2 embestidas seguidas para presionar de verdad
-      if ((z.chain||0) < 2 && Math.random() < 0.6) { z.chain = (z.chain||0)+1; z.state = 'telegraph'; z.stateT = BOSS_TELE; }
-      else { z.chain = 0; z.state = 'walk'; z.abilityCd = bossCd(enraged); }
+      // encadena embestidas seguidas (el carnicero hasta 4) para presionar de verdad
+      if ((z.chain||0) < z.maxChain && Math.random() < 0.65) { z.chain = (z.chain||0)+1; z.state = 'telegraph'; z.stateT = BOSS_TELE; }
+      else { z.chain = 0; z.state = 'walk'; z.abilityCd = bossCd(enraged, z); }
     }
     return;
   }
@@ -1871,35 +1972,90 @@ function updateBoss(z, dt, a, d) {
   }
   if (z.state === 'slamTele') {     // prepara el pisotón: zona roja de peligro
     z.stateT -= dt; z.hitFlash = 0.1; z.wob += dt*22;
-    if (z.stateT <= 0) { bossSlamHit(z, enraged); z.state = 'walk'; z.abilityCd = bossCd(enraged); }
+    if (z.stateT <= 0) { bossSlamHit(z, enraged, z.x, z.y); z.state = 'walk'; z.abilityCd = bossCd(enraged, z); }
     return;
   }
-  // caminar hacia el jugador
-  const wob = Math.sin(z.wob += dt*6)*0.3;
-  moveCollide(z, z.x + Math.cos(a+wob)*spd*dt, z.y + Math.sin(a+wob)*spd*dt);
-  // elegir habilidad cuando toca: cerca pisotea/embiste, lejos dispara/invoca
+  if (z.state === 'leapTele') {     // el carnicero se agazapa y fija el punto de caída
+    z.stateT -= dt; z.hitFlash = 0.1; z.wob += dt*30;
+    z.leapX += (player.x - z.leapX)*Math.min(1, dt*3);   // sigue un poco al jugador
+    z.leapY += (player.y - z.leapY)*Math.min(1, dt*3);
+    if (z.stateT <= 0) { z.fromX = z.x; z.fromY = z.y; z.state = 'leap'; z.stateT = 0.34; z.leapDur = 0.34; Sfx.crash(); }
+    return;
+  }
+  if (z.state === 'leap') {         // salto en arco hasta el punto fijado
+    z.stateT -= dt;
+    const t = 1 - Math.max(0, z.stateT)/z.leapDur;
+    z.x = z.fromX + (z.leapX - z.fromX)*t;
+    z.y = z.fromY + (z.leapY - z.fromY)*t;
+    if (z.stateT <= 0) { z.x = z.leapX; z.y = z.leapY; bossSlamHit(z, enraged, z.x, z.y); z.state = 'walk'; z.abilityCd = bossCd(enraged, z); }
+    return;
+  }
+  if (z.state === 'spin') {         // giro cortante: AoE alrededor mientras avanza
+    z.stateT -= dt; z.spinHitCd -= dt; z.wob += dt*40;
+    moveCollide(z, z.x + Math.cos(a)*spd*1.15*dt, z.y + Math.sin(a)*spd*1.15*dt);
+    const spinR = z.r + 26*SC;
+    for (let i=0;i<2;i++){ const sa=z.wob+i*Math.PI;
+      particles.push({ x:z.x+Math.cos(sa)*spinR, y:z.y+Math.sin(sa)*spinR, vx:0, vy:0, life:0.18, col:'#e8e8e8', size:2*SC }); }
+    if (d < spinR + player.r && z.spinHitCd <= 0) {
+      z.spinHitCd = 0.35;
+      player.hp -= Math.round(z.dmg*0.7); player.hurtFlash = 0.3; shake = Math.min(shake+5,10); Sfx.hurt();
+      const kx=player.x-z.x, ky=player.y-z.y, kd=Math.hypot(kx,ky)||1;
+      moveCollide(player, player.x + kx/kd*30*SC, player.y + ky/kd*30*SC);
+      if (player.hp <= 0){ player.hp = 0; gameOver(); return; }
+      updateHud();
+    }
+    if (z.stateT <= 0) { z.state = 'walk'; z.abilityCd = bossCd(enraged, z); }
+    return;
+  }
+
+  // ---------- movimiento base (la Madre Tóxica mantiene distancia) ----------
+  if (z.kind === 'plague') {
+    const want = 200*SC;
+    if (d < want*0.8)      moveCollide(z, z.x - Math.cos(a)*spd*dt, z.y - Math.sin(a)*spd*dt);   // retrocede
+    else if (d > want*1.3) moveCollide(z, z.x + Math.cos(a)*spd*dt, z.y + Math.sin(a)*spd*dt);   // se acerca
+    else                   moveCollide(z, z.x + Math.cos(a+Math.PI/2)*spd*0.7*dt, z.y + Math.sin(a+Math.PI/2)*spd*0.7*dt); // ronda
+  } else {
+    const wob = Math.sin(z.wob += dt*6)*0.3;
+    moveCollide(z, z.x + Math.cos(a+wob)*spd*dt, z.y + Math.sin(a+wob)*spd*dt);
+  }
+
+  // ---------- elegir habilidad según el tipo de jefe ----------
   if (z.abilityCd <= 0) {
     const r = Math.random();
-    if (d < z.slamR*0.85 && r < 0.32)     { z.state = 'slamTele'; z.stateT = enraged ? 0.45 : 0.6; Sfx.bang(); }
-    else if (d < 240*SC || r < 0.62)      { z.state = 'telegraph'; z.stateT = BOSS_TELE; }   // embiste casi siempre
-    else if (r < 0.85)                      bossBarrage(z, enraged);
-    else                                    bossSummon(z, enraged);
-    z.abilityCd = bossCd(enraged);
+    if (z.kind === 'plague') {
+      if (d < 150*SC && r < 0.4)        bossBlink(z, enraged);                       // parpadea para huir + anillo
+      else if (r < 0.58)                 bossNova(z, enraged);                        // anillo de ácido 360º
+      else if (r < 0.82)                 bossAcidFan(z, enraged);                     // abanico de ácido dirigido
+      else if (r < 0.92)                 bossPool(z, enraged);                        // suelta charcos tóxicos
+      else                               bossSummon(z, enraged, 'spitter');
+    } else if (z.kind === 'butcher') {
+      if (r < 0.46)                     { z.state = 'telegraph'; z.stateT = BOSS_TELE; } // combo de embestidas
+      else if (d < 260*SC && r < 0.74) { z.state = 'spin'; z.stateT = enraged ? 1.3 : 1.0; z.spinHitCd = 0; Sfx.crash(); }
+      else if (r < 0.92)                bossLeap(z);                                  // salto con impacto
+      else                              bossSummon(z, enraged, 'runner');
+    } else { // colossus
+      if (d < z.slamR*0.85 && r < 0.32) { z.state = 'slamTele'; z.stateT = enraged ? 0.45 : 0.6; Sfx.bang(); }
+      else if (d < 240*SC || r < 0.62)  { z.state = 'telegraph'; z.stateT = BOSS_TELE; }
+      else if (r < 0.85)                bossBarrage(z, enraged);
+      else                              bossSummon(z, enraged);
+    }
+    z.abilityCd = bossCd(enraged, z);
   }
 }
 
-// pisotón: daño en área dentro de slamR + empujón + onda expansiva
-function bossSlamHit(z, enraged) {
+// pisotón / impacto de caída: daño en área dentro de slamR + empujón + onda expansiva
+function bossSlamHit(z, enraged, cx, cy) {
+  cx = cx ?? z.x; cy = cy ?? z.y;
   shake = Math.min(shake + 9, 12); Sfx.crash();
-  shocks.push({ x:z.x, y:z.y, maxR:z.slamR, age:0, dur:0.45 });
+  shocks.push({ x:cx, y:cy, maxR:z.slamR, age:0, dur:0.45 });
   for (let i=0;i<26;i++){ const ang=Math.random()*Math.PI*2, s=(60+Math.random()*150)*SC;
-    particles.push({ x:z.x, y:z.y, vx:Math.cos(ang)*s, vy:Math.sin(ang)*s, life:0.4+Math.random()*0.3,
+    particles.push({ x:cx, y:cy, vx:Math.cos(ang)*s, vy:Math.sin(ang)*s, life:0.4+Math.random()*0.3,
       col:Math.random()<0.5?'#6b6b6b':'#8a6638', size:(2+(Math.random()*2|0))*SC }); }
-  const d = Math.hypot(player.x-z.x, player.y-z.y);
+  const d = Math.hypot(player.x-cx, player.y-cy);
   if (d < z.slamR) {
     const dmg = Math.round((16 + wave*1.6) * (enraged?1.3:1) * (1 - d/z.slamR*0.5));
     player.hp -= dmg; player.hurtFlash = 0.35;
-    const kx=player.x-z.x, ky=player.y-z.y, kd=Math.hypot(kx,ky)||1;
+    const kx=player.x-cx, ky=player.y-cy, kd=Math.hypot(kx,ky)||1;
     moveCollide(player, player.x + kx/kd*60*SC, player.y + ky/kd*60*SC);
     if (player.hp <= 0){ player.hp = 0; gameOver(); return; }
     updateHud();
@@ -1918,26 +2074,80 @@ function bossBarrage(z, enraged) {
   }
 }
 
+// MADRE TÓXICA — anillo de ácido en todas direcciones
+function bossNova(z, enraged) {
+  Sfx.spit(); z.hitFlash = 0.15; shake = Math.min(shake+3, 9);
+  const n = enraged ? 16 : 12;
+  const off = Math.random()*Math.PI*2;
+  const dmg = 8 + Math.floor(wave*0.5);
+  for (let i=0;i<n;i++){
+    const sa = off + (i/n)*Math.PI*2;
+    spits.push({ x:z.x, y:z.y, vx:Math.cos(sa)*185*SC, vy:Math.sin(sa)*185*SC, life:2.3, dmg, r:5*SC });
+  }
+}
+
+// MADRE TÓXICA — abanico de ácido dirigido al jugador
+function bossAcidFan(z, enraged) {
+  Sfx.spit();
+  const n = 5 + (enraged ? 3 : 0);
+  const base = Math.atan2(player.y-z.y, player.x-z.x);
+  const dmg = 9 + Math.floor(wave*0.5);
+  for (let i=0;i<n;i++){
+    const sa = base + (i-(n-1)/2)*0.18;
+    spits.push({ x:z.x, y:z.y, vx:Math.cos(sa)*225*SC, vy:Math.sin(sa)*225*SC, life:2.4, dmg, r:5*SC });
+  }
+}
+
+// MADRE TÓXICA — suelta charcos tóxicos (daño por estar dentro)
+function bossPool(z, enraged) {
+  Sfx.spit(); toast('¡Charcos tóxicos!');
+  const n = 2 + (enraged ? 2 : 0);
+  for (let i=0;i<n;i++){
+    const cx = i===0 ? player.x : z.x, cy = i===0 ? player.y : z.y;
+    const ang = Math.random()*Math.PI*2, rr = (10+Math.random()*70)*SC;
+    const x = cx + Math.cos(ang)*rr, y = cy + Math.sin(ang)*rr;
+    if (!solidAt(x,y)) pools.push({ x, y, r:(26+Math.random()*10)*SC, ttl:6+(enraged?2:0), dmg:6+Math.floor(wave*0.3), dmgCd:0, t:0 });
+  }
+}
+
+// MADRE TÓXICA — parpadea para flanquear al jugador, deja un charco y suelta un anillo al reaparecer
+function bossBlink(z, enraged) {
+  pools.push({ x:z.x, y:z.y, r:30*SC, ttl:5, dmg:6+Math.floor(wave*0.3), dmgCd:0, t:0 });
+  for (let i=0;i<14;i++){ const ang=Math.random()*Math.PI*2, s=(40+Math.random()*120)*SC;
+    particles.push({ x:z.x, y:z.y, vx:Math.cos(ang)*s, vy:Math.sin(ang)*s, life:0.4, col:'#8fd14a', size:2*SC }); }
+  let nx, ny, tries=0;
+  do { const ang=Math.random()*Math.PI*2, rr=(120+Math.random()*90)*SC;
+       nx = player.x + Math.cos(ang)*rr; ny = player.y + Math.sin(ang)*rr; tries++; }
+  while ((solidAt(nx,ny) || nx<20*SC || ny<20*SC || nx>W-20*SC || ny>H-20*SC) && tries<20);
+  if (!solidAt(nx,ny)) { z.x = nx; z.y = ny; }
+  Sfx.crash(); bossNova(z, enraged);
+}
+
+// CARNICERO — telegrafía el salto con impacto (zona de caída marcada)
+function bossLeap(z) {
+  z.state = 'leapTele'; z.stateT = 0.55; z.leapX = player.x; z.leapY = player.y; Sfx.bang();
+}
+
 // el jefe ruge e invoca zombies a su alrededor (no cuentan para la oleada)
-function bossSummon(z, enraged) {
+function bossSummon(z, enraged, prefer) {
   Sfx.wave(); toast('¡El jefe invoca refuerzos!');
   z.hitFlash = 0.2; shake = Math.min(shake+3, 10);
   const n = 3 + (Math.random()*2|0) + (enraged ? 2 : 0);
   for (let i=0;i<n;i++){
     const ang = Math.random()*Math.PI*2, rr = z.r + (22+Math.random()*34)*SC;
     const x = z.x + Math.cos(ang)*rr, y = z.y + Math.sin(ang)*rr;
-    if (!solidAt(x,y)) makeZombie(x, y, 0.5, false);   // fromWave=false: no suman al cupo
+    if (!solidAt(x,y)) makeZombie(x, y, 0.5, false, prefer);   // fromWave=false: no suman al cupo
   }
 }
 // crea un zombie en una posición concreta (reutilizable: spawn, sustos de cajas, etc.)
 // fromWave=true cuenta para el cupo de la oleada; los sustos de cajas son extra
-function makeZombie(x, y, atkCd, fromWave) {
-  const tp = pickZombieType();
-  const hp = Math.round(tp.hp * (1 + wave*0.10) + Math.floor(wave/3));   // vida crece con la oleada
+function makeZombie(x, y, atkCd, fromWave, forceType) {
+  const tp = (forceType && ZTYPES[forceType]) ? ZTYPES[forceType] : pickZombieType();
+  const hp = Math.round((tp.hp * (1 + wave*0.10) + Math.floor(wave/3)) * (curMod?.hpMul || 1));   // vida crece con la oleada
   const zsprite = (tp.id==='normal' && Math.random()<0.4) ? zombieB : tp.sprite;
   zombies.push({
     x, y, r:tp.r, type:tp,
-    speed: tp.speed + (Math.random()*8 + wave*1.2)*SC,
+    speed: (tp.speed + (Math.random()*8 + wave*1.2)*SC) * (curMod?.spdMul || 1),
     hp, maxHp:hp, dmg:tp.dmg, sprite:zsprite,
     ang:0, wob:Math.random()*Math.PI*2, hitFlash:0, atkCd:atkCd||0, shootCd:1+Math.random()*1.5,
     fromWave: !!fromWave,
@@ -2250,9 +2460,10 @@ function shoot() {
 // ====================== ECONOMÍA / NIVEL ======================
 function gainKill(z) {
   const tp = z.type || ZTYPES.normal;
-  score += tp.score;
-  save.money += tp.cash;
-  addXp(tp.xp);
+  const rw = curMod?.rewardMul || 1;   // modificador de oleada "botín"
+  score += Math.round(tp.score * rw);
+  save.money += Math.round(tp.cash * rw);
+  addXp(Math.round(tp.xp * rw));
   Sfx.zombieDeath();
   if (tp.boom) boomerBurst(z);   // revienta en vómito al morir
   // el jefe suelta botín extra al caer
@@ -2290,7 +2501,8 @@ function advanceWave() {
     player.grenadeCount = Math.min(GADGETS.grenade.max, player.grenadeCount + 1);
   startWave(next);
   Sfx.wave();
-  toast(isBossWave(next) ? `¡Oleada ${next}! Se acerca un JEFE` : `¡Oleada ${next}! Cambia de arma (10s)`);
+  if (curMod) toast(`¡Oleada ${next}! ${curMod.icon} ${curMod.name} — ${curMod.desc}`);
+  else toast(isBossWave(next) ? `¡Oleada ${next}! Se acerca un JEFE` : `¡Oleada ${next}! Cambia de arma (10s)`);
   persist();
 }
 function addXp(n) {
@@ -2402,7 +2614,8 @@ function update(dt) {
     const sx = z.x-player.x, sy = z.y-player.y, sd = Math.hypot(sx,sy);
     if (sd < sep && sd > 0.01) moveCollide(z, z.x + sx/sd*(sep-sd), z.y + sy/sd*(sep-sd));
     if (z.hitFlash > 0) z.hitFlash -= dt;
-    if (d < z.r+player.r+1 && z.atkCd<=0) {
+    const airborne = z.isBoss && (z.state==='leap' || z.state==='leapTele' || z.state==='spin');
+    if (d < z.r+player.r+1 && z.atkCd<=0 && !airborne) {
       const charging = z.isBoss && z.state === 'charge';
       const hit = charging ? Math.round(z.dmg*1.6) : z.dmg;
       player.hp -= hit; player.hurtFlash = 0.3; shake = z.isBoss ? 8 : 5; z.atkCd = 0.6;
@@ -2440,6 +2653,21 @@ function update(dt) {
     }
   }
   spits = spits.filter(s => s.life>0 && s.x>-10 && s.x<W+10 && s.y>-10 && s.y<H+10);
+
+  // charcos tóxicos (Madre Tóxica): dañan por tics mientras estás dentro
+  for (const pl of pools) {
+    pl.ttl -= dt; pl.t += dt;
+    if (Math.hypot(player.x-pl.x, player.y-pl.y) < pl.r + player.r) {
+      pl.dmgCd -= dt;
+      if (pl.dmgCd <= 0) {
+        pl.dmgCd = 0.5;
+        player.hp -= pl.dmg; player.hurtFlash = 0.2; Sfx.hurt();
+        if (player.hp <= 0) { player.hp = 0; gameOver(); return; }
+        updateHud();
+      }
+    }
+  }
+  pools = pools.filter(pl => pl.ttl > 0);
 
   // ondas expansivas del pisotón del jefe (solo visual; el daño se aplica al impactar)
   for (const sh of shocks) sh.age += dt;
@@ -2593,6 +2821,15 @@ function draw() {
     drawPickup(p.type, p.x, p.y + bob);
   }
 
+  // charcos tóxicos en el suelo (bajo zombies y ondas)
+  for (const pl of pools) {
+    const fade = Math.min(1, pl.ttl/1.5);
+    ctx.fillStyle = `rgba(74,110,35,${fade*0.4})`;
+    ctx.beginPath(); ctx.arc(pl.x, pl.y, pl.r, 0, 7); ctx.fill();
+    ctx.fillStyle = `rgba(143,209,74,${fade*(0.35+0.1*Math.sin(pl.t*5))})`;
+    ctx.beginPath(); ctx.arc(pl.x, pl.y, pl.r*0.6, 0, 7); ctx.fill();
+  }
+
   // ondas expansivas del pisotón
   for (const sh of shocks) {
     const f = sh.age/sh.dur;
@@ -2600,14 +2837,19 @@ function draw() {
     ctx.lineWidth = 4*SC;
     ctx.beginPath(); ctx.arc(sh.x, sh.y, sh.maxR*f, 0, 7); ctx.stroke();
   }
-  // aviso del jefe: solo la zona de peligro del pisotón (la embestida ya no avisa)
-  for (const z of zombies) if (z.isBoss && z.state === 'slamTele') {
-    const t = 1 - z.stateT/0.6;
+  // aviso del jefe: zona de peligro del pisotón (Coloso) y de la caída del salto (Carnicero)
+  for (const z of zombies) {
+    if (!z.isBoss) continue;
+    let cx, cy, maxT;
+    if (z.state === 'slamTele')      { cx = z.x;     cy = z.y;     maxT = z.enr ? 0.45 : 0.6; }
+    else if (z.state === 'leapTele') { cx = z.leapX; cy = z.leapY; maxT = 0.55; }
+    else continue;
+    const t = 1 - z.stateT/maxT;
     ctx.fillStyle = `rgba(225,55,45,${0.10 + 0.12*Math.abs(Math.sin(z.stateT*22))})`;
-    ctx.beginPath(); ctx.arc(z.x, z.y, z.slamR, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx, cy, z.slamR, 0, 7); ctx.fill();
     ctx.strokeStyle = 'rgba(255,90,60,0.85)';
     ctx.lineWidth = 3*SC;
-    ctx.beginPath(); ctx.arc(z.x, z.y, z.slamR*t, 0, 7); ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx, cy, z.slamR*t, 0, 7); ctx.stroke();
   }
 
   for (const z of zombies) drawEntity(z.sprite, z.x, z.y, z.ang, z.hitFlash>0, z.scale);
@@ -2642,8 +2884,8 @@ function draw() {
 
   // balas con contorno
   for (const b of bullets) {
-    ctx.fillStyle='#caa53a'; ctx.fillRect(b.x-2*SC, b.y-2*SC, 4*SC, 4*SC);
-    ctx.fillStyle='#ffe89a'; ctx.fillRect(b.x-SC, b.y-SC, 2*SC, 2*SC);
+    ctx.fillStyle=bulletEdge; ctx.fillRect(b.x-2*SC, b.y-2*SC, 4*SC, 4*SC);
+    ctx.fillStyle=bulletCore; ctx.fillRect(b.x-SC, b.y-SC, 2*SC, 2*SC);
   }
 
   // escupitajos de ácido (y escombros del jefe)
@@ -2673,6 +2915,15 @@ function draw() {
     ctx.fillStyle='#d14b4b'; ctx.fillRect(z.x-bw/2, z.y-z.r-6*SC, bw*(z.hp/z.maxHp), 2*SC);
   }
 
+  // niebla (modificador): visión reducida alrededor del jugador
+  if (curMod && curMod.fog) {
+    const R = 150*SC;
+    const g = ctx.createRadialGradient(player.x, player.y, R*0.45, player.x, player.y, R*1.8);
+    g.addColorStop(0, 'rgba(8,11,16,0)');
+    g.addColorStop(1, 'rgba(6,9,14,0.93)');
+    ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
+  }
+
   if (player.hurtFlash > 0) { ctx.fillStyle=`rgba(200,30,30,${player.hurtFlash*0.8})`; ctx.fillRect(0,0,W,H); }
   // vómito en pantalla: te ciega al recibir el ataque del vomitador
   if (player.blind > 0) {
@@ -2695,7 +2946,7 @@ function draw() {
     ctx.fillStyle = '#ff8a6a'; ctx.fillRect(bx, by, bw*frac, 2*SC);
     ctx.fillStyle = '#fff'; ctx.font = `bold ${11*SC}px monospace`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-    ctx.fillText('JEFE', W/2, by-4*SC);
+    ctx.fillText(bz.bossName || 'JEFE', W/2, by-4*SC);
     ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
   }
 
@@ -2931,8 +3182,9 @@ function renderShop() {
   document.getElementById('shopMoney').textContent = save.money;
   document.getElementById('shopLevel').textContent = save.level;
   document.querySelectorAll('.shop-tab').forEach(b => b.classList.toggle('on', b.dataset.tab === shopTab));
-  if (shopTab === 'perks')   return renderPerks();
-  if (shopTab === 'gadgets') return renderGadgets();
+  if (shopTab === 'perks')     return renderPerks();
+  if (shopTab === 'gadgets')   return renderGadgets();
+  if (shopTab === 'cosmetics') return renderCosmetics();
   renderWeapons();
 }
 document.querySelectorAll('.shop-tab').forEach(b =>
@@ -3042,6 +3294,80 @@ function equipGadget(id) {
 function unequipGadget(id) {
   save.gadgets = save.gadgets.filter(g => g !== id); persist(); Sfx.equip();
   buildAbilityBar(); renderGadgets();
+}
+
+// ---- COSMÉTICOS (skins de jugador / arma / bala) ----
+function scaleIcon(s, target) {
+  const scale = Math.max(2, Math.round(target / s.width));
+  const c = document.createElement('canvas'); c.width = s.width*scale; c.height = s.height*scale;
+  const g = c.getContext('2d'); g.imageSmoothingEnabled = false;
+  g.drawImage(s, 0, 0, c.width, c.height);
+  return c.toDataURL();
+}
+function playerSkinIcon(id) { return scaleIcon(buildPlayerSprite(id), 56); }
+function weaponSkinIcon(id) {
+  const pal = Object.assign({}, GP, WEAPON_SKINS[id].pal);
+  return scaleIcon(outline(makeSprite(padRows(WART.rifle), pal, SC), '#0b0d10'), 72);
+}
+function bulletSkinIcon(id) {
+  const b = BULLET_SKINS[id];
+  const c = document.createElement('canvas'); c.width = 64; c.height = 40;
+  const g = c.getContext('2d'); g.imageSmoothingEnabled = false;
+  for (let i=0;i<3;i++){ const x=14+i*18, y=20;
+    g.fillStyle = b.edge; g.fillRect(x-6,y-6,12,12);
+    g.fillStyle = b.core; g.fillRect(x-3,y-3,6,6);
+  }
+  return c.toDataURL();
+}
+function cosmeticSection(grid, title, reg, owned, equippedId, cat, iconFn) {
+  const h = document.createElement('div');
+  h.className = 'small';
+  h.style.cssText = 'grid-column:1/-1;font-weight:700;color:#ffd24a;margin-top:6px;border-bottom:1px solid rgba(255,210,74,.25);padding-bottom:4px';
+  h.textContent = title;
+  grid.appendChild(h);
+  for (const id in reg) {
+    const it = reg[id];
+    const own = owned.includes(id);
+    const eq = equippedId === id;
+    const card = document.createElement('div');
+    card.className = 'card' + (eq ? ' equipped' : '');
+    let act;
+    if (eq)        act = `<button class="act owned" disabled>✔ EQUIPADO</button>`;
+    else if (own)  act = `<button class="act equip" data-cos="${cat}:${id}">EQUIPAR</button>`;
+    else           act = `<button class="act buy" data-cosbuy="${cat}:${id}" ${save.money<it.price?'disabled':''}>COMPRAR $${it.price}</button>`;
+    card.innerHTML = `
+      <div class="nm">${it.name} ${eq?'<span class="tag">★</span>':''}</div>
+      <img class="ico" src="${iconFn(id)}" style="height:48px;width:auto;image-rendering:pixelated;margin:8px auto;display:block" alt="">
+      ${act}`;
+    grid.appendChild(card);
+  }
+}
+function renderCosmetics() {
+  const grid = document.getElementById('shopGrid');
+  grid.innerHTML = '';
+  cosmeticSection(grid, '👤 JUGADOR', PLAYER_SKINS, save.ownedPlayer,     save.skinPlayer, 'player', playerSkinIcon);
+  cosmeticSection(grid, '🔫 ARMAS',   WEAPON_SKINS, save.ownedWeaponSkin, save.skinWeapon, 'weapon', weaponSkinIcon);
+  cosmeticSection(grid, '🎯 BALAS',   BULLET_SKINS, save.ownedBullet,     save.skinBullet, 'bullet', bulletSkinIcon);
+  grid.querySelectorAll('[data-cos]').forEach(b =>
+    b.addEventListener('click', () => { const [c,i] = b.dataset.cos.split(':'); equipCosmetic(c, i); }));
+  grid.querySelectorAll('[data-cosbuy]').forEach(b =>
+    b.addEventListener('click', () => { const [c,i] = b.dataset.cosbuy.split(':'); buyCosmetic(c, i); }));
+}
+function equipCosmetic(cat, id) {
+  if (cat === 'player')      { save.skinPlayer = id; applyPlayerSkin(); }
+  else if (cat === 'weapon') { save.skinWeapon = id; applyWeaponSkin();
+    const hwIcon = document.getElementById('hwIcon'); if (hwIcon) hwIcon.dataset.wp = ''; if (running) updateHud(); }
+  else if (cat === 'bullet') { save.skinBullet = id; applyBulletSkin(); }
+  persist(); Sfx.equip(); renderCosmetics();
+}
+function buyCosmetic(cat, id) {
+  const reg   = cat==='player' ? PLAYER_SKINS : cat==='weapon' ? WEAPON_SKINS : BULLET_SKINS;
+  const owned = cat==='player' ? save.ownedPlayer : cat==='weapon' ? save.ownedWeaponSkin : save.ownedBullet;
+  const it = reg[id];
+  if (!it || owned.includes(id) || save.money < it.price) { Sfx.empty(); return; }
+  save.money -= it.price; owned.push(id);
+  Sfx.buy(); toast(`Comprado: ${it.name}`);
+  equipCosmetic(cat, id);   // al comprar, se equipa automáticamente
 }
 
 // ====================== BARRA DE HABILIDADES ======================
@@ -3220,15 +3546,28 @@ function refreshMenuStats() {
      Nivel: <span style="color:#4ab3ff">${save.level}</span> ·
      Mejor puntuación: <span style="color:#6fe26f">${save.best}</span> ·
      Armas: ${save.owned.length}/${WEAPON_ORDER.length} ·
-     Mapa: <span style="color:#e2754f">${(MAPS[save.map]||MAPS.snow).name}</span>`;
+     Mapa: <span style="color:#e2754f">${(MAPS[save.map]||MAPS.city).name}</span>`;
 }
 
 // ====================== BOTONES ======================
+const elModPrompt = document.getElementById('modPrompt');
 document.getElementById('playBtn').addEventListener('click', () => {
   Sfx.unlock();
+  elMenu.classList.add('hidden');
+  elModPrompt.classList.remove('hidden');   // pregunta si quiere modificadores
+});
+function beginGame(on) {
+  modifiersOn = on;
+  save.modifiers = on; persist();
+  elModPrompt.classList.add('hidden');
   elMenu.querySelector('h1').textContent = 'PIXEL ZOMBIES';
   elMenu.querySelector('h1').style.color = '';   // vuelve al rojo de terror del tema
   startGame();
+}
+document.getElementById('modYes').addEventListener('click', () => { Sfx.equip(); beginGame(true); });
+document.getElementById('modNo').addEventListener('click', () => { Sfx.equip(); beginGame(false); });
+document.getElementById('modCancel').addEventListener('click', () => {
+  Sfx.equip(); elModPrompt.classList.add('hidden'); elMenu.classList.remove('hidden');
 });
 document.getElementById('shopBtn').addEventListener('click', () => openShop('menu'));
 document.getElementById('shopBack').addEventListener('click', closeShop);
