@@ -1143,7 +1143,7 @@ function newRegion(id, kind) {
 }
 function gget(reg,cx,cy){ return (cx<0||cy<0||cx>=GX||cy>=GY)?1:reg.grid[cy*GX+cx]; }
 function gset(reg,cx,cy,v){ if(cx>=0&&cy>=0&&cx<GX&&cy<GY) reg.grid[cy*GX+cx]=v; }
-function isSolidCell(v){ return v===1 || v===2; }
+function isSolidCell(v){ return v===1 || v===2 || v===4; }   // 4 = coche aparcado (sólido)
 
 function solidAt(x,y){
   const cx=Math.floor(x/CELL), cy=Math.floor(y/CELL);
@@ -1168,23 +1168,65 @@ function freeCellNear(x, y) {       // busca una celda de suelo libre
   return {x:W/2, y:H/2};
 }
 
-// ---- Generación de una calle ----
+// ---- Generación de una calle (manzanas de edificios + avenidas + mobiliario) ----
 function genStreet(reg) {
   const my=GY/2, mx=GX/2, gap=4;
+  reg.bcol = new Uint8Array(GX*GY);   // tono de fachada por celda de edificio
+  reg.cars = [];
+  // 1) cinturón perimetral de edificios con aberturas centradas hacia las zonas vecinas
   for (let cy=0;cy<GY;cy++) for (let cx=0;cx<GX;cx++){
     let solid=false;
     if (cx<BAND      && !(reg.edges.l && cy>=my-gap/2 && cy<my+gap/2)) solid=true;
     if (cx>=GX-BAND  && !(reg.edges.r && cy>=my-gap/2 && cy<my+gap/2)) solid=true;
     if (cy<BAND      && !(reg.edges.u && cx>=mx-gap/2 && cx<mx+gap/2)) solid=true;
     if (cy>=GY-BAND  && !(reg.edges.d && cx>=mx-gap/2 && cx<mx+gap/2)) solid=true;
-    if (solid) gset(reg,cx,cy,1);
+    if (solid) { gset(reg,cx,cy,1); reg.bcol[cy*GX+cx]=(cx+cy)%5; }
   }
-  // obstáculos (contenedores/coches) en la calle
-  const n = 3 + (Math.random()*3|0);
+  // avenidas principales de 2 carriles que conectan las aberturas opuestas (nunca se edifican)
+  const isAvenue = (cx,cy) => (cy>=my-1 && cy<=my) || (cx>=mx-1 && cx<=mx);
+  // 2) manzanas de edificios en el interior, separadas por calles secundarias
+  const placed = [];
+  const fits = (bx,by,bw,bh) => {
+    for (let y=by-1;y<=by+bh;y++) for (let x=bx-1;x<=bx+bw;x++){
+      if (x<BAND||y<BAND||x>=GX-BAND||y>=GY-BAND) return false;
+      if (isAvenue(x,y)) return false;
+      if (gget(reg,x,y)!==0) return false;
+    }
+    return true;
+  };
+  let tries=0, want = 5 + (Math.random()*4|0);
+  while (placed.length<want && tries++<140){
+    const bw = 2 + (Math.random()*3|0), bh = 2 + (Math.random()*2|0);
+    const bx = BAND+1 + (Math.random()*(GX-2*BAND-bw-1)|0);
+    const by = BAND+1 + (Math.random()*(GY-2*BAND-bh-1)|0);
+    if (!fits(bx,by,bw,bh)) continue;
+    const tone = 1 + (Math.random()*4|0);
+    for (let y=by;y<by+bh;y++) for (let x=bx;x<bx+bw;x++){ gset(reg,x,y,1); reg.bcol[y*GX+x]=tone; }
+    placed.push({bx,by,bw,bh});
+  }
+  reg.blocks = placed;
+  // 3) coches aparcados junto a las aceras (sólidos, 2 celdas)
+  const carCols=['#7a2e2e','#2e4a7a','#3a6a3a','#b59a3a','#444a52','#6a3a6a'];
+  let cw=0, ct=0, cwant=2+(Math.random()*3|0);
+  while (cw<cwant && ct++<60){
+    const horiz=Math.random()<0.5;
+    const cx=BAND+1+(Math.random()*(GX-2*BAND-3)|0);
+    const cy=BAND+1+(Math.random()*(GY-2*BAND-3)|0);
+    const x2=horiz?cx+1:cx, y2=horiz?cy:cy+1;
+    if (gget(reg,cx,cy)!==0||gget(reg,x2,y2)!==0) continue;
+    if (isAvenue(cx,cy)||isAvenue(x2,y2)) continue;
+    gset(reg,cx,cy,4); gset(reg,x2,y2,4);
+    reg.cars.push({x:cx*CELL, y:cy*CELL, horiz, col:carCols[Math.random()*carCols.length|0]});
+    cw++;
+  }
+  // 4) clutter de calle: contenedores/cajas (destructibles) sobre suelo libre
+  const n = 4 + (Math.random()*4|0);
   for (let i=0;i<n;i++){
-    const ox = BAND+2 + (Math.random()*(GX-2*BAND-5)|0);
-    const oy = BAND+2 + (Math.random()*(GY-2*BAND-5)|0);
-    gset(reg,ox,oy,2); gset(reg,ox+1,oy,2);
+    const ox = BAND+1 + (Math.random()*(GX-2*BAND-2)|0);
+    const oy = BAND+1 + (Math.random()*(GY-2*BAND-2)|0);
+    if (gget(reg,ox,oy)!==0) continue;
+    gset(reg,ox,oy,2);
+    if (Math.random()<0.4 && gget(reg,ox+1,oy)===0) gset(reg,ox+1,oy,2);
   }
 }
 // ---- Edificio con interior dentro de una calle ----
@@ -1217,29 +1259,88 @@ function genRoom(room) {
   }
 }
 
-// ---- Pintado por celdas ----
-function paintFloor(g,x,y,reg,cx,cy){
-  g.fillStyle='#33363b'; g.fillRect(x,y,CELL,CELL);
-  for (let i=0;i<3;i++){ g.fillStyle=Math.random()<0.5?'#2e3136':'#3a3e44'; g.fillRect(x+Math.random()*CELL, y+Math.random()*CELL, 2*SC, 2*SC); }
-  g.fillStyle='#5b5f66';
-  if (gget(reg,cx,cy-1)===1) g.fillRect(x,y,CELL,4*SC);
-  if (gget(reg,cx,cy+1)===1) g.fillRect(x,y+CELL-4*SC,CELL,4*SC);
-  if (gget(reg,cx-1,cy)===1) g.fillRect(x,y,4*SC,CELL);
-  if (gget(reg,cx+1,cy)===1) g.fillRect(x+CELL-4*SC,y,4*SC,CELL);
+// ---- Paletas de la ciudad e interiores ----
+const CITY = {
+  road:'#2c2f34', ground:'#34373c', walk:'#565b63', walkLine:'#3c4047', lane:'#c8a93e',
+  facadeTop:['#2c333f','#392f2b','#2c3a33','#39362a','#33313a'],
+  facade:   ['#3b4250','#4a3f38','#3a4a42','#4a4636','#42404c'],
+  win:      ['#5b6b7a','#6a5a4a','#5a6a5a','#6a6450','#5e5a6e'],
+};
+const ROOM_THEMES = {
+  oficina: { name:'Oficina', floor:'#3a4046', floor2:'#333940', wall:'#586273', wallTop:'#3e4757', rug:'#2e3a55' },
+  tienda:  { name:'Tienda',  floor:'#bfae86', floor2:'#b3a079', wall:'#7a5a36', wallTop:'#5c4327', rug:'#7a3030' },
+  casa:    { name:'Casa',    floor:'#6e5436', floor2:'#634b30', wall:'#8a6a44', wallTop:'#5e4730', rug:'#6a4a4a' },
+  almacen: { name:'Almacén', floor:'#4a4d52', floor2:'#43464b', wall:'#5a5e64', wallTop:'#3c4045', rug:'#4a4438' },
+  clinica: { name:'Clínica', floor:'#cdd6dc', floor2:'#bfc9d0', wall:'#9fb0bc', wallTop:'#7e8e9a', rug:'#8fd1c4' },
+};
+
+// ---- Pintado de la calle ----
+function paintStreetCell(g,x,y,reg,cx,cy,road){
+  if (road){
+    g.fillStyle=CITY.road; g.fillRect(x,y,CELL,CELL);
+    if (Math.random()<0.22){ g.fillStyle='#26292e'; g.fillRect(x+Math.random()*CELL,y+Math.random()*CELL,4*SC,2*SC); }
+  } else {
+    g.fillStyle=CITY.ground; g.fillRect(x,y,CELL,CELL);
+    for (let i=0;i<2;i++){ g.fillStyle=Math.random()<0.5?'#2f3237':'#3a3e44'; g.fillRect(x+Math.random()*CELL,y+Math.random()*CELL,2*SC,2*SC); }
+  }
+  const wk=v=>v===1||v===4;   // acera junto a edificios y coches
+  g.fillStyle=CITY.walk;
+  if (wk(gget(reg,cx,cy-1))) g.fillRect(x,y,CELL,5*SC);
+  if (wk(gget(reg,cx,cy+1))) g.fillRect(x,y+CELL-5*SC,CELL,5*SC);
+  if (wk(gget(reg,cx-1,cy))) g.fillRect(x,y,5*SC,CELL);
+  if (wk(gget(reg,cx+1,cy))) g.fillRect(x+CELL-5*SC,y,5*SC,CELL);
+  g.fillStyle=CITY.walkLine;
+  if (wk(gget(reg,cx,cy-1))) g.fillRect(x,y+5*SC,CELL,SC);
+  if (wk(gget(reg,cx,cy+1))) g.fillRect(x,y+CELL-6*SC,CELL,SC);
+  if (wk(gget(reg,cx-1,cy))) g.fillRect(x+5*SC,y,SC,CELL);
+  if (wk(gget(reg,cx+1,cy))) g.fillRect(x+CELL-6*SC,y,SC,CELL);
 }
-function paintRoof(g,x,y,reg,cx,cy){
-  g.fillStyle='#2b2f36'; g.fillRect(x,y,CELL,CELL);
-  g.fillStyle='#15181d';
-  if (gget(reg,cx,cy-1)!==1) g.fillRect(x,y,CELL,3*SC);
-  if (gget(reg,cx,cy+1)!==1) g.fillRect(x,y+CELL-3*SC,CELL,3*SC);
-  if (gget(reg,cx-1,cy)!==1) g.fillRect(x,y,3*SC,CELL);
-  if (gget(reg,cx+1,cy)!==1) g.fillRect(x+CELL-3*SC,y,3*SC,CELL);
-  const below = gget(reg,cx,cy+1);
-  if (below===0 || below===3){   // ventana en la cara que da a la calle
+function paintBuilding(g,x,y,reg,cx,cy){
+  const t=reg.bcol?reg.bcol[cy*GX+cx]:0;
+  g.fillStyle=CITY.facadeTop[t]; g.fillRect(x,y,CELL,CELL);
+  const up=gget(reg,cx,cy-1)!==1, dn=gget(reg,cx,cy+1)!==1, lf=gget(reg,cx-1,cy)!==1, rt=gget(reg,cx+1,cy)!==1;
+  const exposed=up||dn||lf||rt;
+  g.fillStyle=CITY.facade[t];      // parapeto en caras expuestas
+  if (up) g.fillRect(x,y,CELL,5*SC);
+  if (dn) g.fillRect(x,y+CELL-5*SC,CELL,5*SC);
+  if (lf) g.fillRect(x,y,5*SC,CELL);
+  if (rt) g.fillRect(x+CELL-5*SC,y,5*SC,CELL);
+  g.fillStyle='rgba(0,0,0,0.22)';
+  if (up) g.fillRect(x,y+5*SC,CELL,2*SC);
+  if (lf) g.fillRect(x+5*SC,y,2*SC,CELL);
+  const below=gget(reg,cx,cy+1);   // ventana iluminada hacia la calle
+  if (below===0||below===3){
     const r=Math.random();
-    g.fillStyle = r<0.2?'#e0b94a':(r<0.5?'#0e1216':'#586676');
-    g.fillRect(x+CELL*0.25, y+CELL*0.42, CELL*0.5, CELL*0.42);
-    g.fillStyle='#15181d'; g.fillRect(x+CELL*0.25, y+CELL*0.6, CELL*0.5, 2*SC);
+    g.fillStyle = r<0.24?'#ffd76a':(r<0.55?'#11161c':CITY.win[t]);
+    g.fillRect(x+CELL*0.2,y+CELL*0.52,CELL*0.6,CELL*0.3);
+    g.fillStyle='#0c0f13'; g.fillRect(x+CELL*0.5-SC,y+CELL*0.52,2*SC,CELL*0.3);
+    g.fillRect(x+CELL*0.2,y+CELL*0.66,CELL*0.6,SC);
+  }
+  if (!exposed){                   // detalles de azotea (AC, respiraderos)
+    const r=Math.random();
+    if (r<0.3){ g.fillStyle='#22262c'; g.fillRect(x+CELL*0.28,y+CELL*0.28,CELL*0.44,CELL*0.44);
+                g.fillStyle='#3a4048'; g.fillRect(x+CELL*0.32,y+CELL*0.32,CELL*0.36,CELL*0.16); }
+    else if (r<0.46){ g.fillStyle='#2a2e34'; g.fillRect(x+CELL*0.36,y+CELL*0.34,CELL*0.28,CELL*0.32);
+                g.fillStyle='#4a5058'; g.fillRect(x+CELL*0.4,y+CELL*0.3,CELL*0.2,CELL*0.1); }
+  }
+}
+function drawParkedCar(g,c){
+  const w=c.horiz?CELL*2:CELL, h=c.horiz?CELL:CELL*2, x=c.x, y=c.y;
+  g.fillStyle='rgba(0,0,0,0.3)'; g.fillRect(x+3*SC,y+h-4*SC,w-6*SC,4*SC);
+  g.fillStyle='#0c0e12'; g.fillRect(x+2*SC,y+2*SC,w-4*SC,h-4*SC);
+  g.fillStyle=c.col;      g.fillRect(x+3*SC,y+3*SC,w-6*SC,h-6*SC);
+  if (c.horiz){
+    g.fillStyle='#9fb3c4'; g.fillRect(x+CELL*0.6,y+5*SC,CELL*0.8,h-10*SC);
+    g.fillStyle='#1a1d22'; g.fillRect(x+CELL*1.0-SC,y+5*SC,2*SC,h-10*SC);
+    g.fillStyle='#ffe089'; g.fillRect(x+w-5*SC,y+5*SC,3*SC,4*SC); g.fillRect(x+w-5*SC,y+h-9*SC,3*SC,4*SC);
+    g.fillStyle='#15171c'; g.fillRect(x+6*SC,y,8*SC,2*SC); g.fillRect(x+w-14*SC,y,8*SC,2*SC);
+    g.fillRect(x+6*SC,y+h-2*SC,8*SC,2*SC); g.fillRect(x+w-14*SC,y+h-2*SC,8*SC,2*SC);
+  } else {
+    g.fillStyle='#9fb3c4'; g.fillRect(x+5*SC,y+CELL*0.6,w-10*SC,CELL*0.8);
+    g.fillStyle='#1a1d22'; g.fillRect(x+5*SC,y+CELL*1.0-SC,w-10*SC,2*SC);
+    g.fillStyle='#ffe089'; g.fillRect(x+5*SC,y+h-5*SC,4*SC,3*SC); g.fillRect(x+w-9*SC,y+h-5*SC,4*SC,3*SC);
+    g.fillStyle='#15171c'; g.fillRect(x,y+6*SC,2*SC,8*SC); g.fillRect(x,y+h-14*SC,2*SC,8*SC);
+    g.fillRect(x+w-2*SC,y+6*SC,2*SC,8*SC); g.fillRect(x+w-2*SC,y+h-14*SC,2*SC,8*SC);
   }
 }
 function paintDoor(g,x,y){
@@ -1250,43 +1351,76 @@ function paintDoor(g,x,y){
   g.fillRect(x+CELL*0.82-3*SC,y+2*SC,3*SC,CELL-2*SC);
   g.fillStyle='#e0b94a'; g.fillRect(x+CELL*0.46, y+CELL*0.4, CELL*0.08, CELL*0.2);
 }
-function paintObstacle(g,x,y){
-  g.fillStyle='#14161b'; g.fillRect(x+2*SC,y+2*SC,CELL-4*SC,CELL-4*SC);
-  g.fillStyle='#46603a'; g.fillRect(x+4*SC,y+4*SC,CELL-8*SC,CELL-8*SC);
-  g.fillStyle='#33492b'; g.fillRect(x+4*SC,y+4*SC,CELL-8*SC,4*SC);
-}
 function decorateDebris(g,reg){
-  for (let i=0;i<70;i++){
+  for (let i=0;i<55;i++){
     const cx=(Math.random()*GX|0), cy=(Math.random()*GY|0);
     if (reg.grid[cy*GX+cx]!==0) continue;
     const x=cx*CELL+Math.random()*CELL, y=cy*CELL+Math.random()*CELL;
-    if (Math.random()<0.3){ g.fillStyle='rgba(90,20,20,0.4)'; g.fillRect(x-5*SC,y-3*SC,10*SC,6*SC); }
+    if (Math.random()<0.25){ g.fillStyle='rgba(90,20,20,0.4)'; g.fillRect(x-5*SC,y-3*SC,10*SC,6*SC); }
     else { g.fillStyle=Math.random()<0.5?'#26282d':'#3a3d42'; g.fillRect(x,y,3*SC,3*SC); }
   }
 }
 function paintCity(reg){
   const b=document.createElement('canvas'); b.width=W; b.height=H;
   const g=b.getContext('2d'); g.imageSmoothingEnabled=false;
+  const my=GY/2, mx=GX/2;
+  const isAvenue=(cx,cy)=>(cy>=my-1&&cy<=my)||(cx>=mx-1&&cx<=mx);
   for (let cy=0;cy<GY;cy++) for (let cx=0;cx<GX;cx++){
     const v=reg.grid[cy*GX+cx], x=cx*CELL, y=cy*CELL;
-    if (v===1) paintRoof(g,x,y,reg,cx,cy);
-    else { paintFloor(g,x,y,reg,cx,cy); if (v===3) paintDoor(g,x,y); }
+    if (v===1) paintBuilding(g,x,y,reg,cx,cy);
+    else { paintStreetCell(g,x,y,reg,cx,cy,isAvenue(cx,cy)); if (v===3) paintDoor(g,x,y); }
   }
+  // líneas de carril discontinuas en las avenidas
+  g.fillStyle=CITY.lane;
+  for (let cx=BAND;cx<GX-BAND;cx++) if (cx%2===0) g.fillRect(cx*CELL+CELL*0.25, my*CELL-SC, CELL*0.5, 2*SC);
+  for (let cy=BAND;cy<GY-BAND;cy++) if (cy%2===0) g.fillRect(mx*CELL-SC, cy*CELL+CELL*0.25, 2*SC, CELL*0.5);
+  // pasos de cebra en las salidas a otras zonas
+  g.fillStyle='#c4c8cd';
+  if (reg.edges.l) for (let i=0;i<4;i++) g.fillRect(CELL*0.4,(my-2)*CELL+i*CELL*0.9+CELL*0.2,CELL*1.6,CELL*0.3);
+  if (reg.edges.r) for (let i=0;i<4;i++) g.fillRect((GX-BAND)*CELL,(my-2)*CELL+i*CELL*0.9+CELL*0.2,CELL*1.6,CELL*0.3);
+  if (reg.edges.u) for (let i=0;i<4;i++) g.fillRect((mx-2)*CELL+i*CELL*0.9+CELL*0.2,CELL*0.4,CELL*0.3,CELL*1.6);
+  if (reg.edges.d) for (let i=0;i<4;i++) g.fillRect((mx-2)*CELL+i*CELL*0.9+CELL*0.2,(GY-BAND)*CELL,CELL*0.3,CELL*1.6);
+  for (const c of reg.cars||[]) drawParkedCar(g,c);   // coches aparcados
   decorateDebris(g,reg);
   reg.bg=b;
 }
+
+// ---- Pintado del interior (temático y decorado) ----
+function paintRoomDecor(g,d,th){
+  if (d.type==='rug'){
+    g.fillStyle=th.rug; g.fillRect(d.x-d.w/2,d.y,d.w,d.h);
+    g.strokeStyle='rgba(0,0,0,0.22)'; g.lineWidth=2*SC; g.strokeRect(d.x-d.w/2+2*SC,d.y+2*SC,d.w-4*SC,d.h-4*SC);
+    g.fillStyle='rgba(255,255,255,0.07)'; g.fillRect(d.x-d.w/2+4*SC,d.y+4*SC,d.w-8*SC,2*SC);
+  } else if (d.type==='reception'){
+    g.fillStyle='#2c2016'; g.fillRect(d.x,d.y,CELL*4,CELL*1.4);
+    g.fillStyle='#5a4326'; g.fillRect(d.x,d.y,CELL*4,7*SC);
+    g.fillStyle='#caa53a'; g.fillRect(d.x,d.y+7*SC,CELL*4,2*SC);
+    g.fillStyle='#15181d'; g.fillRect(d.x+CELL*0.5,d.y+11*SC,CELL*0.9,CELL*0.5);   // monitor
+    g.fillStyle='#3a6a8a'; g.fillRect(d.x+CELL*0.6,d.y+12*SC,CELL*0.7,CELL*0.32);
+  } else if (d.type==='plant'){
+    g.fillStyle='#2a1d12'; g.fillRect(d.x+CELL*0.28,d.y+CELL*0.52,CELL*0.44,CELL*0.4);
+    g.fillStyle='#2f6a2f'; g.beginPath(); g.arc(d.x+CELL*0.5,d.y+CELL*0.42,CELL*0.34,0,7); g.fill();
+    g.fillStyle='#3f8a3f'; g.beginPath(); g.arc(d.x+CELL*0.4,d.y+CELL*0.32,CELL*0.2,0,7); g.fill();
+  }
+}
 function paintRoom(reg){
+  const th=ROOM_THEMES[reg.theme]||ROOM_THEMES.oficina;
   const b=document.createElement('canvas'); b.width=W; b.height=H;
   const g=b.getContext('2d'); g.imageSmoothingEnabled=false;
   for (let cy=0;cy<GY;cy++) for (let cx=0;cx<GX;cx++){
     const v=reg.grid[cy*GX+cx], x=cx*CELL, y=cy*CELL;
-    if (v===1){ g.fillStyle='#3a3030'; g.fillRect(x,y,CELL,CELL); g.fillStyle='#241c1c'; g.fillRect(x,y,CELL,3*SC); }
-    else {
-      g.fillStyle='#5e4a30'; g.fillRect(x,y,CELL,CELL);
-      g.fillStyle='#54422b'; g.fillRect(x,y+CELL-3*SC,CELL,2*SC);
+    if (v===1){
+      g.fillStyle=th.wall; g.fillRect(x,y,CELL,CELL);
+      g.fillStyle=th.wallTop; g.fillRect(x,y,CELL,4*SC);
+      g.fillStyle='rgba(0,0,0,0.18)'; g.fillRect(x,y+CELL-3*SC,CELL,3*SC);
+    } else {
+      g.fillStyle=((cx+cy)&1)?th.floor:th.floor2; g.fillRect(x,y,CELL,CELL);
+      g.fillStyle='rgba(255,255,255,0.03)'; g.fillRect(x,y,CELL,SC);
+      g.fillStyle='rgba(0,0,0,0.10)'; g.fillRect(x,y+CELL-SC,CELL,SC);
       if (v===3) paintDoor(g,x,y);
     }
   }
+  for (const d of reg.decor||[]) paintRoomDecor(g,d,th);
   reg.bg=b;
 }
 
@@ -1398,34 +1532,71 @@ function regionLabel(){
   return m ? `Zona ${+m[1]+1}-${+m[2]+1}` : '';
 }
 
-// zombies pegados al jugador que cruzarán con él
-function nearbyFollowers(){
-  return zombies
-    .filter(z => Math.hypot(z.x-player.x, z.y-player.y) < CELL*4)
-    .slice(0, 6);
-}
-// cambia de región y reubica al jugador (los seguidores cruzan también)
-function goRegion(id, x, y, followers){
+// cambia de región y reubica al jugador (los zombies que quedan en otras zonas
+// no se teletransportan: te siguen caminando y entran por el borde, ver updateMigration)
+function goRegion(id, x, y){
   if (!world.regions[id]) return;
-  const prev = curRegion;
   curRegion = world.regions[id];
-  if (followers && followers.length){
-    prev.zombies = prev.zombies.filter(z => !followers.includes(z));
-    for (const z of followers){
-      z.x = x + (Math.random()-0.5)*CELL*2.4;
-      z.y = y + (Math.random()-0.5)*CELL*2.4;
-      if (solidAt(z.x, z.y)) { z.x = x; z.y = y; }
-      z.atkCd = 0.5;
-      curRegion.zombies.push(z);
-    }
-  }
   zombies = curRegion.zombies; pickups = curRegion.pickups; decals = curRegion.decals;
   bullets=[]; spits=[]; particles=[]; shocks=[];
   if (curRegion.kind==='room'){ curRegion.doorHP=100; curRegion.broken=false; curRegion.bangCd=0; curRegion.breachCd=0; }
   player.x=x; player.y=y; player.transCd=0.4;
   mouse.down=false;
+  migrateCd = 0.2;   // los rezagados empiezan a entrar enseguida
   Sfx.equip();
   updateHud();
+}
+
+// ---- Migración de zombies entre zonas ----
+// Los zombies que se quedaron en otras zonas caminan hasta ti: van entrando a tu
+// zona actual por el borde que la conecta (en dirección a donde estaban), de forma
+// escalonada, para que parezca que te persiguen y cruzan a pie.
+function firstStepDirs(){
+  // BFS por el grafo de zonas: primera dirección a tomar desde la zona actual
+  const dirs = {}, q = [];
+  for (const d of ['l','r','u','d']){
+    const nid = curRegion.edges[d];
+    if (nid && !(nid in dirs)) { dirs[nid] = d; q.push(nid); }
+  }
+  while (q.length){
+    const reg = world.regions[q.shift()];
+    for (const d of ['l','r','u','d']){
+      const nid = reg.edges[d];
+      if (nid && nid !== curRegion.id && !(nid in dirs)) { dirs[nid] = dirs[reg.id]; q.push(nid); }
+    }
+  }
+  return dirs;
+}
+function placeEntering(z, dir){
+  const j = (Math.random()-0.5)*CELL*1.5;   // dentro de la abertura central del borde
+  if (dir==='l')      { z.x = BAND*CELL + z.r + 6;     z.y = H/2 + j; }
+  else if (dir==='r') { z.x = W - BAND*CELL - z.r - 6; z.y = H/2 + j; }
+  else if (dir==='u') { z.y = BAND*CELL + z.r + 6;     z.x = W/2 + j; }
+  else                { z.y = H - BAND*CELL - z.r - 6; z.x = W/2 + j; }
+  if (solidAt(z.x, z.y)) { if (dir==='l'||dir==='r') z.y = H/2; else z.x = W/2; }
+  z.atkCd = 0.3;
+}
+function updateMigration(dt){
+  if (curRegion.kind === 'field') return;   // mapa de una sola zona: nada que migrar
+  migrateCd -= dt;
+  if (migrateCd > 0) return;
+  migrateCd = 0.32;                          // cadencia de entrada (stream a pie)
+  const dirs = firstStepDirs();
+  for (const dir of ['l','r','u','d']){
+    // fuente preferida: la zona adyacente; si no, cualquiera que pase por este borde
+    let src = world.regions[curRegion.edges[dir]];
+    if (!src || !src.zombies.length) {
+      src = null;
+      for (const idr in world.regions){
+        if (idr === curRegion.id) continue;
+        if (dirs[idr] === dir && world.regions[idr].zombies.length) { src = world.regions[idr]; break; }
+      }
+    }
+    if (!src || !src.zombies.length) continue;
+    const z = src.zombies.pop();
+    placeEntering(z, dir);
+    curRegion.zombies.push(z);
+  }
 }
 
 // asedio: zombies de la calle aporrean y derriban la puerta del interior
@@ -1464,14 +1635,13 @@ function updateSiege(dt){
 function handleTransitions(){
   if (player.transCd>0) return;
   const r=player.r, edge=r+4;   // pegado a la abertura del borde
-  const f = nearbyFollowers();
-  if (player.x <= edge     && curRegion.edges.l) return goRegion(curRegion.edges.l, W-BAND*CELL-r-6, player.y, f);
-  if (player.x >= W-edge   && curRegion.edges.r) return goRegion(curRegion.edges.r, BAND*CELL+r+6, player.y, f);
-  if (player.y <= edge     && curRegion.edges.u) return goRegion(curRegion.edges.u, player.x, H-BAND*CELL-r-6, f);
-  if (player.y >= H-edge   && curRegion.edges.d) return goRegion(curRegion.edges.d, player.x, BAND*CELL+r+6, f);
+  if (player.x <= edge     && curRegion.edges.l) return goRegion(curRegion.edges.l, W-BAND*CELL-r-6, player.y);
+  if (player.x >= W-edge   && curRegion.edges.r) return goRegion(curRegion.edges.r, BAND*CELL+r+6, player.y);
+  if (player.y <= edge     && curRegion.edges.u) return goRegion(curRegion.edges.u, player.x, H-BAND*CELL-r-6);
+  if (player.y >= H-edge   && curRegion.edges.d) return goRegion(curRegion.edges.d, player.x, BAND*CELL+r+6);
   for (const d of curRegion.doors){
     const px=d.cx*CELL+CELL/2, py=d.cy*CELL+CELL/2;
-    if (Math.hypot(player.x-px, player.y-py) < CELL*0.6) return goRegion(d.to, d.toX, d.toY, f);
+    if (Math.hypot(player.x-px, player.y-py) < CELL*0.6) return goRegion(d.to, d.toX, d.toY);
   }
   // sin salida en ese lado: limita dentro de la pantalla
   player.x=Math.max(r,Math.min(W-r,player.x));
@@ -1481,6 +1651,7 @@ function handleTransitions(){
 // ====================== ESTADO ======================
 let player, bullets, zombies, particles, decals, pickups, spits, shocks, keys, mouse;
 let turret, grenades;   // gadgets desplegados en el mapa
+let migrateCd;          // temporizador de entrada de zombies rezagados de otras zonas
 let wave, score, spawnTimer, betweenWaves, pickupTimer, killsThisWave;
 let waveTotal, waveSpawned;   // zombies totales de la oleada y cuántos van spawneados
 let shake, running, paused, last;
@@ -1507,7 +1678,7 @@ function reset() {
   buildWorld();
   zombies = curRegion.zombies; pickups = curRegion.pickups; decals = curRegion.decals;
   bullets=[]; particles=[]; spits=[]; shocks=[]; keys={};
-  turret=null; grenades=[];
+  turret=null; grenades=[]; migrateCd=0;
   const start = freeCellNear(W/2, H/2);
   player.x = start.x; player.y = start.y;
   mouse={ x:W/2, y:0, down:false };
@@ -2110,6 +2281,7 @@ function update(dt) {
     particles.push({ x:player.x, y:player.y, vx:0, vy:0, life:0.2, col:'#8fd3ff', size:3*SC });
   }
   updateGadgets(dt);
+  updateMigration(dt);   // los zombies rezagados de otras zonas van entrando a pie
   if (player.transCd > 0) player.transCd -= dt;
   handleTransitions();                                // cambio de región / puertas
   if (touchInput.aimActive) player.ang = Math.atan2(touchInput.aimY, touchInput.aimX);  // joystick movil
