@@ -15,7 +15,7 @@
 <!-- Fuentes tematicas (con conexion; si no, usan las del sistema) -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Creepster&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
 <style>
   :root {
     --bg: #0a0c10;
@@ -30,9 +30,9 @@
     --gold: #ffc23a;
     --info: #4ab3ff;
     --line: rgba(255,255,255,.09);
-    --ui: 'Oswald','Arial Narrow',system-ui,-apple-system,sans-serif;
-    --horror: 'Creepster','Oswald',system-ui,cursive;
-    --mono: 'Courier New',ui-monospace,monospace;
+    --ui: 'VT323','Courier New',monospace;
+    --pixel: 'Press Start 2P','VT323',monospace;
+    --mono: 'VT323','Courier New',monospace;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body {
@@ -61,7 +61,7 @@
     image-rendering: pixelated;
     image-rendering: crisp-edges;
     background: #cfd8de;
-    box-shadow: 0 0 0 2px #05070a, 0 0 0 4px rgba(193,53,43,.25), 0 26px 70px rgba(0,0,0,.7);
+    box-shadow: 0 0 0 3px #05070a, 0 0 0 6px #1a1f29, 0 0 0 8px #05070a;
     cursor: crosshair;
     width: 100vw;
     height: 56.25vw;
@@ -84,16 +84,15 @@
   .vico.hp { color: #ff5a4d; }
   .vico.sta { color: #8af256; }
   .vbar {
-    width: clamp(106px,20vmin,168px); height: clamp(7px,1.3vmin,11px);
-    background: rgba(6,8,11,.5); border-radius: 30px; overflow: hidden;
-    box-shadow: inset 0 0 0 1px rgba(255,255,255,.08), 0 1px 3px rgba(0,0,0,.55);
+    width: clamp(106px,20vmin,168px); height: clamp(8px,1.5vmin,12px);
+    background: #06080b; border: 2px solid #05070a; overflow: hidden;
   }
-  .vbar > i { display: block; height: 100%; width: 100%; border-radius: 30px; transition: width .12s linear; }
-  .vbar.hp > i  { background: linear-gradient(90deg,#ff5a4d,#b81e16); }
-  .vbar.sta > i { background: linear-gradient(90deg,#8af256,#3f7a22); }
-  .vbar.xp { width: clamp(72px,13vmin,108px); height: clamp(4px,.8vmin,6px); }
-  .vbar.xp > i  { background: linear-gradient(90deg,#4ab3ff,#1d6fb8); width: 0; }
-  .vlvl { font-size: clamp(9px,1.6vmin,11px); font-weight:600; letter-spacing:1px; text-transform:uppercase; color:#cdd6de; text-shadow:0 1px 2px #000; }
+  .vbar > i { display: block; height: 100%; width: 100%; transition: width .12s linear; }
+  .vbar.hp > i  { background: #e2433a; }
+  .vbar.sta > i { background: #79e04a; }
+  .vbar.xp { width: clamp(72px,13vmin,108px); height: clamp(5px,1vmin,8px); }
+  .vbar.xp > i  { background: #4ab3ff; width: 0; }
+  .vlvl { font-family: var(--ui); font-size: clamp(13px,2.4vmin,16px); letter-spacing:1px; text-transform:uppercase; color:#cdd6de; text-shadow:1px 1px 0 #000; }
   .vlvl b { color: var(--info); }
 
   /* Oleada + marcador: arriba-centro */
@@ -102,32 +101,44 @@
     left: 50%; transform: translateX(-50%); text-align: center;
     text-shadow: 0 1px 3px #000, 0 0 6px rgba(0,0,0,.7);
   }
-  .hud-wave { font-size: clamp(9px,1.7vmin,12px); font-weight:600; letter-spacing: clamp(2px,.9vmin,5px); text-transform: uppercase; color: #aab4bd; line-height: 1; }
-  .hud-wave b { display:block; font-weight:700; font-size: clamp(20px,4vmin,30px); letter-spacing: 1px; color: #fff; margin-top: 2px; }
-  .hud-meta { font-family: var(--mono); font-size: clamp(10px,1.8vmin,13px); color: #cdd6de; margin-top: clamp(2px,.6vmin,4px); }
-  .hud-meta b { color: #fff; font-weight: 700; }
-  .hud-meta .money { color: var(--gold); }
+  .hud-wave { font-family: var(--pixel); font-size: clamp(7px,1.4vmin,10px); letter-spacing: clamp(2px,.9vmin,4px); text-transform: uppercase; color: #aab4bd; line-height: 1; }
+  .hud-wave b { display:block; font-family: var(--pixel); font-size: clamp(15px,3.2vmin,24px); color: #fff; margin-top: 5px; text-shadow: 2px 2px 0 #000; }
+  /* Puntos + dinero: junto al nivel, mismo estilo pequeño */
+  .hud-stats { display: flex; gap: clamp(8px,2vmin,14px); margin-top: 1px; font-family: var(--ui); }
+  .hud-stats span { font-size: clamp(13px,2.4vmin,16px); letter-spacing:.6px; text-transform:uppercase; color:#cdd6de; text-shadow:1px 1px 0 #000; }
+  .hud-stats b { color: #fff; }
+  .hud-stats .money { color: var(--gold); }
 
   /* Arma equipada (estilo Free Fire): arriba-derecha */
   .hud-weapon {
     position: absolute;
     top: calc(11px + env(safe-area-inset-top));
     right: calc(13px + env(safe-area-inset-right));
-    display: flex; flex-direction: column; align-items: flex-end; gap: 1px;
-    background: rgba(8,10,14,.42); border: 1px solid rgba(255,255,255,.08);
-    border-radius: 12px; padding: clamp(5px,1.2vmin,9px) clamp(9px,1.8vmin,14px);
-    backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
-    box-shadow: 0 6px 20px rgba(0,0,0,.4);
+    display: flex; flex-direction: column; align-items: flex-end; gap: 2px;
+    background: rgba(8,10,14,.62); border: 2px solid #05070a;
+    box-shadow: inset 0 0 0 1px #2b333f, 3px 3px 0 rgba(0,0,0,.45);
+    padding: clamp(5px,1.2vmin,9px) clamp(9px,1.8vmin,14px);
     font-family: var(--ui);
   }
   .hw-top { display: flex; align-items: center; gap: clamp(6px,1.6vmin,12px); }
-  .hw-ammo { font-family: var(--mono); line-height: 1; white-space: nowrap; text-shadow: 0 1px 2px #000; }
-  .hw-ammo b { font-size: clamp(19px,4.2vmin,33px); color: #fff; font-weight: 700; }
-  .hw-ammo span { font-size: clamp(11px,2.1vmin,16px); color: var(--muted); }
+  .hw-ammo { line-height: 1; white-space: nowrap; text-shadow: 2px 2px 0 #000; }
+  .hw-ammo b { font-family: var(--pixel); font-size: clamp(15px,3.4vmin,26px); color: #fff; }
+  .hw-ammo span { font-family: var(--mono); font-size: clamp(13px,2.5vmin,18px); color: var(--muted); }
   .hw-ammo.low b { color: #ff5a4d; }
   .hw-ico { height: clamp(15px,3.2vmin,25px); width: auto; image-rendering: pixelated; filter: drop-shadow(0 2px 3px rgba(0,0,0,.6)); }
-  .hw-name { font-size: clamp(9px,1.7vmin,12px); font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: #aeb8c1; text-shadow: 0 1px 2px #000; }
+  .hw-name { font-family: var(--ui); font-size: clamp(13px,2.4vmin,16px); letter-spacing: 1px; text-transform: uppercase; color: #aeb8c1; text-shadow: 1px 1px 0 #000; }
   .hw-name.reload { color: var(--gold); }
+
+  /* Aviso: descanso entre oleadas (abajo-centro) */
+  #switchMsg {
+    position: absolute; left: 50%; bottom: calc(clamp(12px,3vmin,22px) + env(safe-area-inset-bottom));
+    transform: translateX(-50%); text-align: center;
+    background: var(--toxic); border: 2px solid #05070a;
+    padding: clamp(5px,1.2vmin,9px) clamp(12px,2.4vmin,18px);
+    box-shadow: 3px 3px 0 rgba(0,0,0,.5); white-space: nowrap;
+  }
+  #switchMsg .sw-time { font-family: var(--pixel); font-size: clamp(9px,1.9vmin,13px); color: #07120a; text-transform: uppercase; letter-spacing: 1px; }
+  #switchMsg .sw-sub { font-family: var(--ui); font-size: clamp(12px,2.3vmin,16px); color: #0a2208; text-transform: uppercase; letter-spacing: .5px; margin-top: 3px; }
 
   .screen {
     position: fixed; inset: 0;
@@ -137,8 +148,7 @@
     justify-content: safe center;   /* si el contenido no cabe, no corta arriba */
     z-index: 10; text-align: center;
     padding: clamp(10px, 3vmin, 28px);
-    background: radial-gradient(120% 120% at 50% 30%, rgba(10,13,18,.82), rgba(4,6,9,.95));
-    backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+    background: rgba(6,8,11,.9);
     overflow-y: auto; -webkit-overflow-scrolling: touch;
   }
   .panel {
@@ -147,58 +157,59 @@
     display: flex; flex-direction: column; align-items: center;
     gap: clamp(7px, 1.8vmin, 16px);
     padding: clamp(16px,4vmin,40px) clamp(18px,4.5vmin,46px);
-    background: linear-gradient(180deg, rgba(23,28,37,.97), rgba(11,14,19,.98));
-    border: 1px solid var(--line); border-top: 3px solid var(--blood);
-    border-radius: 14px;
-    box-shadow: 0 30px 80px rgba(0,0,0,.65), inset 0 0 90px rgba(0,0,0,.4), 0 0 0 1px rgba(0,0,0,.5);
+    background: #12161d;
+    border: 3px solid #05070a;
+    box-shadow:
+      inset 0 0 0 2px #2b333f,           /* bisel pixel claro */
+      inset 0 0 0 5px #05070a,
+      0 0 0 3px var(--blood),            /* marco sangre */
+      8px 8px 0 rgba(0,0,0,.55);         /* sombra dura */
     overflow-y: auto; -webkit-overflow-scrolling: touch;
   }
   .panel.wide { max-width: min(940px, 96vw); }
   .screen h1 {
-    font-family: var(--horror); font-weight: 400;
-    font-size: clamp(34px, 9vmin, 72px); line-height: .95;
-    letter-spacing: clamp(1px,.5vmin,4px);
-    color: #d8402f;
-    text-shadow: 0 2px 0 #4a0f0b, 0 0 22px rgba(193,53,43,.55), 3px 4px 0 rgba(0,0,0,.5);
+    font-family: var(--pixel); font-weight: 400;
+    font-size: clamp(19px, 5.4vmin, 44px); line-height: 1.15;
+    letter-spacing: 0;
+    color: #e0402f;
+    text-shadow: 3px 3px 0 #4a0f0b, 6px 6px 0 rgba(0,0,0,.55);
   }
   .subtitle {
-    font-family: var(--ui); font-weight: 600; text-transform: uppercase;
-    font-size: clamp(11px,2.1vmin,16px); letter-spacing: clamp(4px,1.4vmin,9px);
-    color: var(--toxic); margin-top: -.25em; opacity: .92;
+    font-family: var(--pixel); font-weight: 400; text-transform: uppercase;
+    font-size: clamp(7px,1.6vmin,11px); letter-spacing: clamp(2px,.8vmin,5px);
+    color: var(--toxic); margin-top: .3em; text-shadow: 2px 2px 0 #04120a;
   }
   .screen h2 {
-    font-family: var(--ui); font-weight: 700; text-transform: uppercase;
-    font-size: clamp(19px, 4.6vmin, 32px); letter-spacing: clamp(1px,.5vmin,3px);
-    color: var(--gold); text-shadow: 0 2px 6px rgba(0,0,0,.6);
-    padding-bottom: clamp(4px,1vmin,8px); margin-bottom: clamp(2px,.6vmin,6px);
-    border-bottom: 2px solid rgba(193,53,43,.5);
+    font-family: var(--pixel); font-weight: 400; text-transform: uppercase;
+    font-size: clamp(13px, 3.4vmin, 24px); letter-spacing: 0;
+    color: var(--gold); text-shadow: 3px 3px 0 rgba(0,0,0,.6);
+    padding-bottom: clamp(6px,1.4vmin,10px); margin-bottom: clamp(2px,.6vmin,6px);
+    border-bottom: 3px solid var(--blood);
   }
-  .screen p { margin: 0; font-size: clamp(12px, 2.3vmin, 15px); color: #b6c1cc; max-width: 52ch; line-height: 1.6; }
-  .screen .key { color: var(--gold); font-weight: 600; }
+  .screen p { margin: 0; font-family: var(--ui); font-size: clamp(15px, 3vmin, 21px); color: #c2ccd5; max-width: 46ch; line-height: 1.35; }
+  .screen .key { color: var(--gold); }
   .btn {
-    font-family: var(--ui); font-weight: 700; text-transform: uppercase;
-    font-size: clamp(13px, 2.5vmin, 18px); letter-spacing: clamp(1px,.4vmin,2px);
-    margin: clamp(3px,.8vmin,7px);
-    padding: clamp(9px,1.7vmin,14px) clamp(18px,3.4vmin,34px);
+    font-family: var(--pixel); font-weight: 400; text-transform: uppercase;
+    font-size: clamp(8px, 1.9vmin, 13px); letter-spacing: 0; line-height: 1.3;
+    margin: clamp(3px,.9vmin,7px);
+    padding: clamp(9px,1.8vmin,15px) clamp(14px,3vmin,28px);
     color: #07120a; cursor: pointer;
-    background: linear-gradient(180deg, #8af256, #57b62f);
-    border: 1px solid #2c5a18; border-radius: 9px;
-    box-shadow: 0 4px 0 #2c5a18, 0 8px 18px rgba(0,0,0,.45);
-    transition: transform .07s, box-shadow .07s, filter .12s;
+    background: #6fd23f;
+    border: 3px solid #05070a;
+    box-shadow: 4px 4px 0 rgba(0,0,0,.55);
+    transition: transform .05s, box-shadow .05s, filter .1s;
   }
-  .btn:hover { filter: brightness(1.08); }
-  .btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #2c5a18, 0 4px 10px rgba(0,0,0,.4); }
-  .btn.alt { color: #04121d; background: linear-gradient(180deg,#6cc6ff,#2f93e6); border-color:#1c5d92; box-shadow:0 4px 0 #1c5d92, 0 8px 18px rgba(0,0,0,.45); }
-  .btn.alt:active { box-shadow: 0 1px 0 #1c5d92, 0 4px 10px rgba(0,0,0,.4); }
-  .btn.ghost { color: var(--ink); background: linear-gradient(180deg,#2b323c,#1d222a); border-color:#3a424e; box-shadow:0 4px 0 #14181e, 0 8px 18px rgba(0,0,0,.4); }
-  .btn.ghost:active { box-shadow: 0 1px 0 #14181e, 0 4px 10px rgba(0,0,0,.4); }
-  .row { display: flex; gap: clamp(4px,1vmin,8px); flex-wrap: wrap; justify-content: center; margin-top: clamp(2px,1vmin,8px); }
-  .small { font-size: clamp(10px,2vmin,13px); color: var(--muted); margin-top: clamp(8px,2vmin,16px); line-height: 1.5; }
+  .btn:hover { filter: brightness(1.1); }
+  .btn:active { transform: translate(4px,4px); box-shadow: 0 0 0 rgba(0,0,0,.55); }
+  .btn.alt   { color: #04121d; background: #54b6f0; }
+  .btn.ghost { color: var(--ink); background: #2b323c; }
+  .row { display: flex; gap: clamp(5px,1.2vmin,10px); flex-wrap: wrap; justify-content: center; margin-top: clamp(2px,1vmin,8px); }
+  .small { font-family: var(--ui); font-size: clamp(13px,2.6vmin,17px); color: var(--muted); margin-top: clamp(8px,2vmin,16px); line-height: 1.35; }
 
   /* ---- Tienda / Arsenal / Mapas ---- */
   #shopBar {
     display: flex; align-items: center; justify-content: center; gap: clamp(14px,3vmin,28px);
-    margin-bottom: clamp(6px,1.4vmin,12px); font-size: clamp(13px,2.5vmin,18px);
+    margin-bottom: clamp(6px,1.4vmin,12px); font-size: clamp(15px,3vmin,21px);
     font-family: var(--mono); letter-spacing: .5px;
   }
   #shopBar .money { color: var(--gold); }
@@ -209,56 +220,55 @@
     max-height: 64vh; overflow-y: auto; padding: 4px;
   }
   .card {
-    background: linear-gradient(180deg,#1a2029,#12161d);
-    border: 1px solid #2a3038; border-radius: 10px;
+    background: #1a2029;
+    border: 3px solid #05070a;
+    box-shadow: inset 0 0 0 1px #2b333f, 4px 4px 0 rgba(0,0,0,.45);
     padding: clamp(9px,1.8vmin,13px); text-align: left; position: relative;
-    transition: transform .1s, border-color .1s, box-shadow .1s;
   }
-  .card:hover { transform: translateY(-2px); border-color: #3a4450; }
-  .card.equipped { border-color: var(--toxic); box-shadow: 0 0 0 1px var(--toxic) inset, 0 0 18px rgba(121,224,74,.18); }
-  .card.locked { opacity: .5; filter: grayscale(.4); }
-  .card .nm { font-family: var(--ui); font-weight:700; font-size: clamp(13px,2.6vmin,16px); letter-spacing:.5px; text-transform:uppercase; display:flex; justify-content:space-between; align-items:center; gap:6px; }
-  .card .ico { display:block; margin: clamp(6px,1.4vmin,10px) auto; image-rendering: pixelated; background:#0a0d12; border:1px solid var(--line); border-radius:6px; padding:6px; }
-  .card .stats { font-family: var(--mono); font-size: clamp(10px,2vmin,12px); color: #9aa6b1; line-height: 1.6; margin: 6px 0; }
-  .card .stats span { color: #dbe3ea; font-weight:700; }
+  .card.equipped { border-color: var(--toxic); box-shadow: inset 0 0 0 1px var(--toxic), 4px 4px 0 rgba(0,0,0,.45); }
+  .card.locked { opacity: .5; filter: grayscale(.5); }
+  .card .nm { font-family: var(--ui); font-size: clamp(16px,3.2vmin,21px); letter-spacing:.5px; text-transform:uppercase; display:flex; justify-content:space-between; align-items:center; gap:6px; color:#eef3f7; }
+  .card .ico { display:block; margin: clamp(6px,1.4vmin,10px) auto; image-rendering: pixelated; background:#0a0d12; border:2px solid #05070a; padding:6px; }
+  .card .ico.wpn { height: clamp(32px,8.5vmin,48px); width: auto; max-width: 100%; }
+  .card .stats { font-family: var(--mono); font-size: clamp(13px,2.6vmin,16px); color: #9aa6b1; line-height: 1.35; margin: 6px 0; }
+  .card .stats span { color: #dbe3ea; }
   .card .act {
-    width: 100%; margin-top: clamp(5px,1.2vmin,8px); padding: clamp(8px,1.6vmin,10px);
-    font-family: var(--ui); font-weight: 700; text-transform: uppercase;
-    font-size: clamp(12px,2.3vmin,14px); letter-spacing: .8px;
-    border: 1px solid rgba(0,0,0,.5); border-radius: 7px; cursor: pointer;
-    transition: filter .1s;
+    width: 100%; margin-top: clamp(5px,1.2vmin,8px); padding: clamp(8px,1.7vmin,11px);
+    font-family: var(--ui); text-transform: uppercase;
+    font-size: clamp(14px,2.8vmin,18px); letter-spacing: .8px;
+    border: 2px solid #05070a; cursor: pointer;
   }
   .card .act:hover:not(:disabled) { filter: brightness(1.1); }
-  .act.buy { background: linear-gradient(180deg,#ffd45a,#e0a51f); color: #1a1300; }
+  .act.buy { background: #ffce4a; color: #1a1300; }
   .act.buy:disabled { background: #463f29; color: #8e876f; cursor: not-allowed; }
-  .act.equip { background: linear-gradient(180deg,#6cc6ff,#2f93e6); color: #04121d; }
-  .act.owned { background: #232a33; color: var(--toxic); cursor: default; border-color: rgba(121,224,74,.3); }
+  .act.equip { background: #54b6f0; color: #04121d; }
+  .act.owned { background: #232a33; color: var(--toxic); cursor: default; }
   .act.locked { background: #232a33; color: #e2754f; cursor: not-allowed; }
-  .tag { font-size: clamp(10px,2vmin,12px); color: var(--gold); }
+  .tag { font-size: clamp(13px,2.6vmin,16px); color: var(--gold); }
 
   /* ---- Ajustes ---- */
   .settings-box { display: flex; flex-direction: column; gap: clamp(8px,1.6vmin,14px); width: min(460px, 92vw); margin-top: clamp(4px,1.2vmin,12px); }
   .setting-row {
     display: flex; align-items: center; gap: clamp(10px,2vmin,16px);
-    background: linear-gradient(180deg,#1a2029,#12161d);
-    border: 1px solid #2a3038; border-radius: 10px;
+    background: #1a2029;
+    border: 3px solid #05070a; box-shadow: inset 0 0 0 1px #2b333f;
     padding: clamp(11px,2.2vmin,15px) clamp(13px,2.4vmin,17px); text-align: left;
   }
-  .setting-row .lbl { font-family: var(--ui); font-weight:600; text-transform:uppercase; font-size: clamp(12px,2.3vmin,15px); letter-spacing: 1px; color: #d6dee6; min-width: clamp(70px,16vmin,90px); }
+  .setting-row .lbl { font-family: var(--ui); text-transform:uppercase; font-size: clamp(15px,3vmin,20px); letter-spacing: 1px; color: #d6dee6; min-width: clamp(70px,16vmin,90px); }
   #volRange { flex: 1; height: clamp(22px,4vmin,28px); accent-color: var(--toxic); cursor: pointer; }
-  #volVal { font-family: var(--mono); font-size: clamp(12px,2.3vmin,14px); color: var(--gold); min-width: 46px; text-align: right; }
-  .setting-row .act { width: auto; margin: 0; padding: clamp(8px,1.6vmin,10px) clamp(13px,2.4vmin,18px); }
+  #volVal { font-family: var(--mono); font-size: clamp(15px,3vmin,20px); color: var(--gold); min-width: 52px; text-align: right; }
+  .setting-row .act { width: auto; margin: 0; padding: clamp(8px,1.7vmin,11px) clamp(13px,2.4vmin,18px); }
 
   .hidden { display: none !important; }
   #toast {
     position: fixed; top: calc(clamp(52px,12vmin,78px) + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%) translateY(-6px);
-    background: linear-gradient(180deg,#1b222c,#11151c); border: 1px solid var(--toxic);
-    border-radius: 9px; color: var(--toxic);
-    font-family: var(--ui); font-weight: 700; text-transform: uppercase;
-    font-size: clamp(12px,2.3vmin,15px); letter-spacing: 1px;
-    padding: clamp(7px,1.5vmin,10px) clamp(14px,3vmin,22px); z-index: 20;
-    box-shadow: 0 10px 30px rgba(0,0,0,.5), 0 0 16px rgba(121,224,74,.15);
-    opacity: 0; transition: opacity .25s, transform .25s; pointer-events: none; text-align: center;
+    background: #11151c; border: 3px solid var(--toxic);
+    color: var(--toxic);
+    font-family: var(--pixel); text-transform: uppercase;
+    font-size: clamp(8px,1.8vmin,12px); letter-spacing: 1px; line-height: 1.4;
+    padding: clamp(8px,1.6vmin,12px) clamp(14px,3vmin,22px); z-index: 20;
+    box-shadow: 4px 4px 0 rgba(0,0,0,.5);
+    opacity: 0; transition: opacity .2s, transform .2s; pointer-events: none; text-align: center;
     max-width: 88vw;
   }
   #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
@@ -308,9 +318,9 @@
 
   /* ---- Menu: estadisticas ---- */
   #menuStats {
-    font-family: var(--mono); font-size: clamp(10px,2vmin,13px);
-    color: var(--muted); line-height: 1.7; margin-top: clamp(6px,1.6vmin,14px);
-    border-top: 1px solid var(--line); padding-top: clamp(6px,1.6vmin,12px);
+    font-family: var(--mono); font-size: clamp(13px,2.6vmin,17px);
+    color: var(--muted); line-height: 1.5; margin-top: clamp(6px,1.6vmin,14px);
+    border-top: 2px solid #2b333f; padding-top: clamp(6px,1.6vmin,12px);
   }
 
   /* ---- Aviso para girar el telefono (movil en vertical) ---- */
@@ -336,11 +346,11 @@
     <div class="vrow"><span class="vico hp">&#10084;</span><div class="vbar hp"><i id="hpFill"></i></div></div>
     <div class="vrow"><span class="vico sta">&#9889;</span><div class="vbar sta"><i id="staFill"></i></div></div>
     <div class="vrow"><span class="vlvl">LV&nbsp;<b id="level">1</b></span><div class="vbar xp"><i id="xpFill"></i></div></div>
+    <div class="hud-stats"><span><b id="score">0</b> pts</span><span class="money">$<span id="money">0</span></span></div>
   </div>
-  <!-- Oleada + marcador: arriba-centro -->
+  <!-- Oleada: arriba-centro -->
   <div class="hud-top">
     <div class="hud-wave">Oleada<b id="wave">1</b></div>
-    <div class="hud-meta"><b id="score">0</b> pts · <span class="money">$<span id="money">0</span></span></div>
   </div>
   <!-- Arma equipada (estilo Free Fire): arriba-derecha -->
   <div class="hud-weapon" id="weaponPanel">
@@ -349,6 +359,11 @@
       <img class="hw-ico" id="hwIcon" alt="">
     </div>
     <div class="hw-name" id="hwName">Pistola</div>
+  </div>
+  <!-- Aviso de descanso entre oleadas -->
+  <div id="switchMsg" class="hidden">
+    <div class="sw-time" id="swTime">DESCANSO · 10s</div>
+    <div class="sw-sub">Cambia de arma solo ahora</div>
   </div>
 </div>
 
@@ -463,22 +478,31 @@ const SC = 2; // factor de escala (resolución duplicada respecto al diseño ori
 // reload: tiempo recarga · spd: velocidad bala · pellets: balas por disparo
 // spread: dispersión (rad) · pierce: enemigos que atraviesa · unlock: nivel · price: $
 const WEAPONS = {
-  pistol:  { name:'Pistola',        dmg:1, fireCd:0.18, mag:12,  reserve:96,  reload:1.0, spd:330, pellets:1, spread:0.05, pierce:0, unlock:1, price:0,    auto:false, barrel:7,  col:'#2a2d33', kick:2 },
-  smg:     { name:'Subfusil',       dmg:1, fireCd:0.07, mag:30,  reserve:180, reload:1.4, spd:340, pellets:1, spread:0.12, pierce:0, unlock:3, price:900,   auto:true,  barrel:8,  col:'#3a3d44', kick:2 },
-  shotgun: { name:'Escopeta',       dmg:1, fireCd:0.55, mag:6,   reserve:42,  reload:1.6, spd:300, pellets:7, spread:0.55, pierce:0, unlock:5, price:1800,  auto:false, barrel:9,  col:'#5a3a22', kick:6 },
-  rifle:   { name:'Fusil de Asalto',dmg:2, fireCd:0.11, mag:30,  reserve:180, reload:1.5, spd:420, pellets:1, spread:0.06, pierce:1, unlock:7, price:3200,  auto:true,  barrel:11, col:'#26301f', kick:3 },
-  sniper:  { name:'Francotirador',  dmg:8, fireCd:0.95, mag:5,   reserve:35,  reload:1.8, spd:650, pellets:1, spread:0.0,  pierce:4, unlock:9, price:5000,  auto:false, barrel:13, col:'#1f2630', kick:8 },
-  lmg:     { name:'Ametralladora',  dmg:2, fireCd:0.05, mag:100, reserve:400, reload:2.6, spd:400, pellets:1, spread:0.14, pierce:1, unlock:12, price:8500, auto:true,  barrel:12, col:'#2d2d2d', kick:2 },
+  pistol:  { name:'Pistola',        dmg:1, fireCd:0.18, mag:12,  reserve:96,  reload:1.0, spd:330, pellets:1, spread:0.05, pierce:0, unlock:1, price:0,    auto:false, barrel:7,  col:'#2a2d33', kick:2, range:640 },
+  smg:     { name:'Subfusil',       dmg:1, fireCd:0.07, mag:30,  reserve:180, reload:1.4, spd:340, pellets:1, spread:0.12, pierce:0, unlock:3, price:900,   auto:true,  barrel:8,  col:'#3a3d44', kick:2, range:560 },
+  shotgun: { name:'Escopeta',       dmg:1, fireCd:0.55, mag:6,   reserve:42,  reload:1.6, spd:300, pellets:7, spread:0.55, pierce:0, unlock:5, price:1800,  auto:false, barrel:9,  col:'#5a3a22', kick:6, range:360 },
+  rifle:   { name:'Fusil de Asalto',dmg:2, fireCd:0.11, mag:30,  reserve:180, reload:1.5, spd:420, pellets:1, spread:0.06, pierce:1, unlock:7, price:3200,  auto:true,  barrel:11, col:'#26301f', kick:3, range:1000 },
+  sniper:  { name:'Francotirador',  dmg:8, fireCd:0.95, mag:5,   reserve:35,  reload:1.8, spd:650, pellets:1, spread:0.0,  pierce:4, unlock:9, price:5000,  auto:false, barrel:13, col:'#1f2630', kick:8, range:1500 },
+  lmg:     { name:'Ametralladora',  dmg:2, fireCd:0.05, mag:100, reserve:400, reload:2.6, spd:400, pellets:1, spread:0.14, pierce:1, unlock:12, price:8500, auto:true,  barrel:12, col:'#2d2d2d', kick:2, range:820 },
+  revolver:{ name:'Revólver',       dmg:4, fireCd:0.5,  mag:6,   reserve:48,  reload:1.3, spd:390, pellets:1, spread:0.02, pierce:1, unlock:2,  price:500,   auto:false, barrel:8,  col:'#4a4f57', kick:6, range:760 },
+  carbine: { name:'Carabina',       dmg:2, fireCd:0.14, mag:24,  reserve:168, reload:1.3, spd:430, pellets:1, spread:0.05, pierce:0, unlock:4,  price:1500,  auto:true,  barrel:10, col:'#3a3f47', kick:2, range:800 },
+  ashotgun:{ name:'Escopeta Auto.', dmg:1, fireCd:0.28, mag:8,   reserve:56,  reload:1.9, spd:300, pellets:6, spread:0.5,  pierce:0, unlock:8,  price:4200,  auto:true,  barrel:9,  col:'#2a2d33', kick:5, range:380 },
+  flame:   { name:'Lanzallamas',    dmg:1, fireCd:0.03, mag:120, reserve:360, reload:2.4, spd:230, pellets:2, spread:0.32, pierce:2, unlock:11, price:6500,  auto:true,  barrel:9,  col:'#7a3a14', kick:1, range:260 },
+  minigun: { name:'Minigun',        dmg:2, fireCd:0.035,mag:150, reserve:600, reload:3.2, spd:420, pellets:1, spread:0.16, pierce:1, unlock:15, price:12000, auto:true,  barrel:12, col:'#2d2d2d', kick:2, range:760 },
 };
-const WEAPON_ORDER = ['pistol','smg','shotgun','rifle','sniper','lmg'];
+const WEAPON_ORDER = ['pistol','revolver','smg','carbine','shotgun','rifle','ashotgun','sniper','flame','lmg','minigun'];
 // Cuchillo: respaldo cuando te quedas sin balas
 const KNIFE = { dmg:3, range:17, arc:1.0, cd:0.34, fxTime:0.18 };
 // escala espacial (velocidad bala, longitud cañón, alcance cuchillo)
-for (const id in WEAPONS) { WEAPONS[id].spd *= SC; WEAPONS[id].barrel *= SC; }
+for (const id in WEAPONS) {
+  WEAPONS[id].spd *= SC; WEAPONS[id].barrel *= SC;
+  WEAPONS[id].maxReserve = WEAPONS[id].reserve * 2;   // tope de munición de reserva
+}
 KNIFE.range *= SC;
 
 // ====================== GUARDADO (persistente) ======================
 const SAVE_KEY = 'pixelZombiesSave_v2';
+const UNLOCK_ALL = true;   // DEV: pon false para volver a la progresion normal (desbloqueo por nivel)
 let save;
 function loadSave() {
   try { save = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch(e) { save = null; }
@@ -492,6 +516,10 @@ function loadSave() {
   save.best     = save.best     ?? 0;
   save.map      = save.map      ?? 'snow';
   save.volume   = (typeof save.volume === 'number') ? save.volume : 1;
+  if (UNLOCK_ALL) {                                  // DEV: todas las armas disponibles para probar
+    save.owned = WEAPON_ORDER.slice();
+    save.level = Math.max(save.level, ...WEAPON_ORDER.map(id => WEAPONS[id].unlock));
+  }
 }
 function persist() { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); }
 function xpForNext(lvl) { return 100 + lvl * lvl * 22; }
@@ -752,6 +780,129 @@ const ZTYPES = {
   tank:    { id:'tank',    hp:26, speed:13, dmg:18, r:9, score:45, cash:16, xp:18, sprite:zombieTank, blood:'#6e1f1f', big:true },
 };
 for (const k in ZTYPES) { ZTYPES[k].speed *= SC; ZTYPES[k].r *= SC; }
+
+// ====================== ARTE DE ARMAS (pixel-art por arma) ======================
+const GP = {
+  d:'#20242b', m:'#3e444c', M:'#646c76', h:'#9aa3ad',
+  g:'#16191e', p:'#2a2e35', w:'#7c5230', W:'#9a6a3e',
+  o:'#d2a73c', r:'#c1352b', y:'#e0b94a', f:'#ff7a1f',
+  c:'#74c6ff', b:'#36421f', B:'#4e5e2a', t:'#233042', n:'#0c0e11',
+};
+const WART = {
+  pistol: [
+    '  MMMMd ',
+    ' dMMMMMd',
+    ' dmmmmd ',
+    'ggdmmd  ',
+    'gggdd   ',
+    ' ggg    ',
+    '  gg    ',
+  ],
+  revolver: [
+    '   MMMMd  ',
+    '  dMMMMMd ',
+    '  dmMMmd  ',
+    'ggdmMMmd  ',
+    'gggdMmd   ',
+    ' gggdd    ',
+    '  ggg     ',
+  ],
+  smg: [
+    '    MMMMMd ',
+    '  ddMMMMMd ',
+    '  dmmmmmmd ',
+    'ggdmpppmd  ',
+    'gggdpmd    ',
+    '  gpmpg    ',
+    '  gpppg    ',
+    '  gppg     ',
+  ],
+  carbine: [
+    '     mMMMMMn',
+    '  ddppppppMd',
+    '  dppppppppd',
+    'gggpppmppd  ',
+    'gggdpmpd    ',
+    '  gpmpg     ',
+    '  gpppg     ',
+    '  ggg       ',
+  ],
+  shotgun: [
+    '     MMMMMMMn',
+    '  wwwMMMMMMMd',
+    '  wwmmmmmmmd ',
+    'wwwwwwwmmd   ',
+    'wwwww   d    ',
+    ' www         ',
+    '  w          ',
+  ],
+  rifle: [
+    '      mMMMMMMMMn',
+    '   dddbbbbbbMMd ',
+    '  dbbbbbbbbbmd  ',
+    'gggbbbpbbbd     ',
+    'gggdbpd         ',
+    '  gbpbg         ',
+    '  gpppg         ',
+    '  gppg          ',
+  ],
+  ashotgun: [
+    '     dMMMMMMn',
+    '  dddMMMMMMd ',
+    '  dmmmmmmmd  ',
+    'gggdmMMmmd   ',
+    'gggdMMMMd    ',
+    '  gdMMMd     ',
+    '  gdMd       ',
+    '  ggg        ',
+  ],
+  sniper: [
+    '       cccc        ',
+    '      cMMMMc        ',
+    '   tttMMMMtttttttn  ',
+    '  ttttttttttMMd     ',
+    'gggttttttd          ',
+    'gggdtd              ',
+    '  gg                ',
+    '  gg                ',
+  ],
+  flame: [
+    '        mMMn  ',
+    '      ddmMd   ',
+    '   yyydmmd    ',
+    '  yyyyymd     ',
+    '  yfyyyd      ',
+    '  yyyyyd      ',
+    'gggyyyd       ',
+    'gggdd         ',
+    '  gg          ',
+  ],
+  lmg: [
+    '    mMMMMMMMMMn ',
+    '  dddMMMMMMMmd  ',
+    '  dmddddddmd    ',
+    '  dmpppppppd    ',
+    'ggdmpppppppd    ',
+    'gggdppppppd     ',
+    '  gddmmd        ',
+    '  M   M         ',
+    ' M     M        ',
+  ],
+  minigun: [
+    '     MMMMMMMMMMMn',
+    '   ddMMMMMMMMMMn ',
+    '  dmMMMMMMMMMMn  ',
+    '  dmmmmmmmmmd    ',
+    'ggdmppppppmd     ',
+    'gggdpppppd       ',
+    '  gdmmmd         ',
+    '  gpppg          ',
+    '  ggg            ',
+  ],
+};
+function padRows(rows) { const w = Math.max(...rows.map(r => r.length)); return rows.map(r => r.padEnd(w, ' ')); }
+function buildGun(rows) { return outline(makeSprite(padRows(rows), GP, SC), '#0b0d10'); }
+for (const id in WART) if (WEAPONS[id]) WEAPONS[id].spr = buildGun(WART[id]);
 
 // ====================== MAPAS / FONDO ======================
 const TILE = 16 * SC;
@@ -1191,7 +1342,6 @@ function goRegion(id, x, y, followers){
   player.x=x; player.y=y; player.transCd=0.4;
   mouse.down=false;
   Sfx.equip();
-  toast(regionLabel());
   updateHud();
 }
 
@@ -1249,6 +1399,7 @@ function handleTransitions(){
 let player, bullets, zombies, particles, decals, pickups, spits, keys, mouse;
 let wave, score, spawnTimer, betweenWaves, pickupTimer, killsThisWave;
 let shake, running, paused, last;
+let switchWindow;   // segundos restantes para poder cambiar de arma (entre oleadas)
 
 function equippedWeapon() { return WEAPONS[save.equipped]; }
 
@@ -1272,7 +1423,7 @@ function reset() {
   player.x = start.x; player.y = start.y;
   mouse={ x:W/2, y:0, down:false };
   wave=1; score=0; shake=0; killsThisWave=0;
-  betweenWaves=false; spawnTimer=0; pickupTimer=8;
+  betweenWaves=false; spawnTimer=0; pickupTimer=8; switchWindow=0;
   running=true; paused=false;
 }
 
@@ -1343,9 +1494,12 @@ function applyPickup(p) {
     player.hp = Math.min(player.maxHp, player.hp + 30);
     Sfx.heal(); toast('+30 vida');
   } else {
-    const chunk = Math.ceil(equippedWeapon().reserve * 0.5);
-    player.reserve += chunk;
-    Sfx.ammoUp(); toast(`+${chunk} munición`);
+    const wp = equippedWeapon();
+    if (player.reserve >= wp.maxReserve) { toast('Munición al máximo'); return; }   // tope alcanzado
+    const chunk = Math.ceil(wp.reserve * 0.5);
+    const before = player.reserve;
+    player.reserve = Math.min(wp.maxReserve, player.reserve + chunk);
+    Sfx.ammoUp(); toast(`+${player.reserve - before} munición`);
   }
   updateHud();
 }
@@ -1502,7 +1656,7 @@ function shoot() {
       x: player.x + Math.cos(player.ang)*10*SC,
       y: player.y + Math.sin(player.ang)*10*SC,
       vx: Math.cos(a)*wp.spd, vy: Math.sin(a)*wp.spd,
-      life:1.0, dmg:wp.dmg, pierce:wp.pierce||0, hits:[]
+      life: (wp.range || wp.spd) / wp.spd, dmg:wp.dmg, pierce:wp.pierce||0, hits:[]
     });
   }
   for (let i=0;i<5;i++){
@@ -1532,7 +1686,8 @@ function gainKill(z) {
     killsThisWave = 0; wave++;
     const bonus = 15 + wave*6;
     save.money += bonus; addXp(8 + wave*2);
-    Sfx.wave(); toast(`¡Oleada ${wave}! +$${bonus}`);
+    switchWindow = 10;   // 10 s para cambiar de arma en el arsenal
+    Sfx.wave(); toast(`¡Oleada ${wave}! Cambia de arma (10s)`);
     persist();
   }
   updateHud();
@@ -1693,28 +1848,36 @@ function update(dt) {
   for (const p of particles) { p.x += p.vx*dt; p.y += p.vy*dt; p.vx*=0.92; p.vy*=0.92; p.life -= dt; }
   particles = particles.filter(p => p.life > 0);
 
-  // spawner continuo
-  if (curRegion.kind === 'room') {
-    updateSiege(dt);   // los zombies de la calle aporrean/derriban la puerta
-    // con la puerta rota, la casa deja de ser segura: siguen entrando
-    if (curRegion.broken) {
-      const target = 4 + wave;
+  // spawner continuo (en pausa durante el descanso entre oleadas)
+  if (switchWindow <= 0) {
+    if (curRegion.kind === 'room') {
+      updateSiege(dt);   // los zombies de la calle aporrean/derriban la puerta
+      // con la puerta rota, la casa deja de ser segura: siguen entrando
+      if (curRegion.broken) {
+        const target = 4 + wave;
+        spawnTimer -= dt;
+        if (zombies.length < target && spawnTimer <= 0) {
+          spawnZombie();
+          spawnTimer = Math.max(0.7, 1.6 - wave*0.03);
+        }
+      }
+    } else {
+      const target = 5 + wave;
       spawnTimer -= dt;
       if (zombies.length < target && spawnTimer <= 0) {
         spawnZombie();
-        spawnTimer = Math.max(0.7, 1.6 - wave*0.03);
+        spawnTimer = Math.max(0.4, 1.3 - wave*0.03);
       }
-    }
-  } else {
-    const target = 5 + wave;
-    spawnTimer -= dt;
-    if (zombies.length < target && spawnTimer <= 0) {
-      spawnZombie();
-      spawnTimer = Math.max(0.4, 1.3 - wave*0.03);
     }
   }
 
   if (shake > 0) shake -= dt*18;
+
+  // ventana para cambiar de arma (entre oleadas)
+  if (switchWindow > 0) switchWindow -= dt;
+  const sm = document.getElementById('switchMsg');
+  if (switchWindow > 0) { sm.classList.remove('hidden'); sm.textContent = `CAMBIA DE ARMA · ${Math.ceil(switchWindow)}s`; }
+  else sm.classList.add('hidden');
 }
 
 function bloodBurst(x, y, vx, vy, n) {
@@ -1763,9 +1926,12 @@ function draw() {
   const noAmmo = player.ammo <= 0 && player.reserve <= 0;
   ctx.save();
   ctx.translate(player.x, player.y); ctx.rotate(player.ang);
+  if (Math.cos(player.ang) < 0) ctx.scale(1, -1);   // evita que el arma salga boca abajo al mirar a la izquierda
   if (noAmmo) {
     ctx.fillStyle = '#3a2a1a'; ctx.fillRect(3*SC, -SC, 3*SC, 2*SC);  // mango
     ctx.fillStyle = '#c2c7cf'; ctx.fillRect(6*SC, -SC, 6*SC, 2*SC);  // hoja
+  } else if (wp.spr) {
+    ctx.drawImage(wp.spr, 2*SC, -(wp.spr.height >> 1));
   } else {
     ctx.fillStyle = '#14161b'; ctx.fillRect(3*SC, -2*SC, wp.barrel+3, 5*SC); // contorno
     ctx.fillStyle = wp.col;    ctx.fillRect(4*SC, -SC, wp.barrel, 3*SC);
@@ -1803,13 +1969,6 @@ function draw() {
 
   if (player.hurtFlash > 0) { ctx.fillStyle=`rgba(200,30,30,${player.hurtFlash*0.8})`; ctx.fillRect(0,0,W,H); }
   ctx.restore();
-
-  // nombre de la zona (arriba centro)
-  ctx.font=`bold ${13*SC}px "Courier New", monospace`; ctx.textAlign='center';
-  ctx.fillStyle='rgba(0,0,0,0.55)'; ctx.fillText(regionLabel(), W/2+SC, 24*SC+SC);
-  ctx.fillStyle = curRegion.kind==='room' ? '#e0b94a' : '#cfd8de';
-  ctx.fillText(regionLabel(), W/2, 24*SC);
-  ctx.textAlign='left';
 
   if (!IS_TOUCH) {   // la mira sigue al raton; en movil se apunta con el joystick
     ctx.strokeStyle='#1a1d22'; ctx.lineWidth=SC; ctx.beginPath();
@@ -1999,20 +2158,16 @@ muteToggle.addEventListener('click', () => {
 });
 
 function weaponIcon(wp) {
-  // genera un mini-canvas con el arma como icono pixel
+  // dibuja el sprite real del arma escalado (fondo transparente)
+  const s = wp.spr;
+  if (!s) return '';
+  const scale = Math.max(2, Math.round(72 / s.width));
   const c = document.createElement('canvas');
-  c.width = 26; c.height = 8;
+  c.width = s.width * scale; c.height = s.height * scale;
   const g = c.getContext('2d');
   g.imageSmoothingEnabled = false;
-  g.fillStyle = '#0c0f14'; g.fillRect(0,0,26,8);
-  g.fillStyle = wp.col; g.fillRect(2, 3, wp.barrel+6, 3);   // cañón
-  g.fillStyle = '#1a1d22'; g.fillRect(2, 5, 6, 3);          // empuñadura
-  if (wp.pellets>1){ g.fillStyle='#5a3a22'; g.fillRect(2,2,wp.barrel+6,2); } // escopeta gruesa
-  const big = document.createElement('canvas');
-  big.width = 78; big.height = 24;
-  const bg2 = big.getContext('2d'); bg2.imageSmoothingEnabled=false;
-  bg2.drawImage(c, 0,0, 78,24);
-  return big.toDataURL();
+  g.drawImage(s, 0, 0, c.width, c.height);
+  return c.toDataURL();
 }
 
 function renderShop() {
@@ -2036,7 +2191,7 @@ function renderShop() {
     const dps = (wp.dmg * wp.pellets / wp.fireCd).toFixed(0);
     card.innerHTML = `
       <div class="nm">${wp.name} ${equipped?'<span class="tag">★</span>':''}</div>
-      <img class="ico" src="${weaponIcon(wp)}" width="78" height="24" alt="">
+      <img class="ico wpn" src="${weaponIcon(wp)}" alt="">
       <div class="stats">
         Daño <span>${wp.dmg}${wp.pellets>1?' x'+wp.pellets:''}</span> ·
         Cadencia <span>${wp.auto?'auto':'semi'}</span><br>
@@ -2053,9 +2208,16 @@ function renderShop() {
     btn.addEventListener('click', () => equipWeapon(btn.dataset.equip)));
 }
 
+// solo se puede cambiar de arma fuera de partida o en la ventana entre oleadas
+function canChangeWeapon() {
+  if (!running || switchWindow > 0) return true;
+  toast('Cambio de arma solo entre oleadas');
+  return false;
+}
 function buyWeapon(id) {
   const wp = WEAPONS[id];
   if (save.owned.includes(id) || save.money < wp.price || save.level < wp.unlock) return;
+  if (!canChangeWeapon()) return;
   save.money -= wp.price;
   save.owned.push(id);
   save.equipped = id;            // al comprar, equipa automáticamente
@@ -2067,6 +2229,7 @@ function buyWeapon(id) {
 }
 function equipWeapon(id) {
   if (!save.owned.includes(id)) return;
+  if (!canChangeWeapon()) return;
   save.equipped = id;
   applyEquip();
   persist();
