@@ -294,10 +294,21 @@
   }
   @media (pointer: coarse) {
     .abil-key { display: none; }
-    .hud-abilities { pointer-events: auto; gap: clamp(6px,1.4vmin,11px); }   /* en móvil sí se tocan */
-    .abil { width: clamp(38px,8.5vmin,48px); height: clamp(38px,8.5vmin,48px); border-radius: 8px; }
-    .abil-ico { font-size: clamp(16px,4vmin,22px); }
-    .abil-info { font-size: clamp(8px,1.5vmin,11px); }
+    /* En móvil: habilidades en columna vertical, encima del stick de apuntado (abajo-derecha),
+       más pequeñas y fuera de la zona de alertas (centro/arriba) y de los botones. */
+    .hud-abilities {
+      pointer-events: auto;
+      left: auto; top: auto; transform: none;
+      right: calc(10px + env(safe-area-inset-right));
+      bottom: calc(clamp(96px,24vmin,132px) + 36px + env(safe-area-inset-bottom));
+      flex-direction: column-reverse;
+      gap: clamp(6px,1.3vmin,9px);
+    }
+    .abil { width: clamp(32px,7vmin,42px); height: clamp(32px,7vmin,42px); border-radius: 8px; }
+    .abil-ico { font-size: clamp(14px,3.4vmin,19px); }
+    .abil-info { font-size: clamp(8px,1.4vmin,10px); }
+    /* el aviso de descanso sube por encima de los botones recarga/correr (centro-abajo) */
+    #switchMsg { bottom: calc(clamp(80px,19vmin,104px) + env(safe-area-inset-bottom)); }
   }
 
   /* ---- Ajustes ---- */
