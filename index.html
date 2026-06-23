@@ -725,9 +725,12 @@ function loadSave() {
   save.skinPlayer = PLAYER_SKINS[save.skinPlayer] ? save.skinPlayer : 'default';
   save.skinWeapon = WEAPON_SKINS[save.skinWeapon] ? save.skinWeapon : 'default';
   save.skinBullet = BULLET_SKINS[save.skinBullet] ? save.skinBullet : 'default';
-  if (UNLOCK_ALL) {                                  // DEV: todas las armas disponibles para probar
+  if (UNLOCK_ALL) {                                  // DEV: todas las armas y cosméticos disponibles
     save.owned = WEAPON_ORDER.slice();
     save.level = Math.max(save.level, ...WEAPON_ORDER.map(id => WEAPONS[id].unlock));
+    save.ownedPlayer     = Object.keys(PLAYER_SKINS);
+    save.ownedWeaponSkin = Object.keys(WEAPON_SKINS);
+    save.ownedBullet     = Object.keys(BULLET_SKINS);
   }
 }
 function persist() { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); }
@@ -1496,6 +1499,28 @@ function circleHits(x,y,r){
 function moveCollide(e, nx, ny){   // movimiento con colisión por ejes (desliza por paredes)
   if (!circleHits(nx, e.y, e.r)) e.x = nx;
   if (!circleHits(e.x, ny, e.r)) e.y = ny;
+}
+// dirección de avance que esquiva paredes: si el camino recto hacia 'baseAng'
+// está bloqueado, abre un abanico a izquierda/derecha y elige el primer hueco
+// libre. Mantiene el sentido de giro elegido (z.steerDir) para rodear la pared
+// sin quedarse oscilando en una esquina. Devuelve el ángulo a seguir.
+function steerAngle(z, baseAng){
+  const probe = z.r + 12*SC;   // cuánto mira por delante
+  if (!circleHits(z.x+Math.cos(baseAng)*probe, z.y+Math.sin(baseAng)*probe, z.r)){
+    z.steerDir = 0;            // camino despejado: olvida la preferencia de giro
+    return baseAng;
+  }
+  const order = z.steerDir < 0 ? [-1, 1] : [1, -1];   // respeta el giro ya iniciado
+  for (const off of [0.6, 1.1, 1.7, 2.3]){            // ~34°, 63°, 97°, 132°
+    for (const s of order){
+      const ang = baseAng + s*off;
+      if (!circleHits(z.x+Math.cos(ang)*probe, z.y+Math.sin(ang)*probe, z.r)){
+        z.steerDir = s;
+        return ang;
+      }
+    }
+  }
+  return baseAng + Math.PI;   // completamente rodeado: media vuelta
 }
 // busca el CENTRO de celda libre más cercano que admita el círculo de colisión completo
 // (no solo el punto central) -> evita reaparecer pegado/dentro de una pared
@@ -3110,6 +3135,7 @@ function makeZombie(x, y, atkCd, fromWave, forceType) {
     speed: (tp.speed + (Math.random()*8 + wave*1.2)*SC) * (curMod?.spdMul || 1),
     hp, maxHp:hp, dmg:tp.dmg, sprite:zsprite,
     ang:0, wob:Math.random()*Math.PI*2, hitFlash:0, atkCd:atkCd||0, shootCd:1+Math.random()*1.5,
+    steerDir:0, stuckT:0, px:x, py:y,   // IA: rodeo de paredes y detección de atasco
     fromWave: !!fromWave,
   });
 }
@@ -3584,7 +3610,10 @@ function update(dt) {
       updateBoss(z, dt, a, d);
     // el escupidor mantiene distancia y lanza ácido
     } else if (z.type && z.type.ranged) {
-      if (d > 130*SC) moveCollide(z, z.x+Math.cos(a+wob)*z.speed*dt, z.y+Math.sin(a+wob)*z.speed*dt);
+      if (d > 130*SC) {
+        const ma = steerAngle(z, a) + (z.steerDir===0 ? wob : 0);
+        moveCollide(z, z.x+Math.cos(ma)*z.speed*dt, z.y+Math.sin(ma)*z.speed*dt);
+      }
       z.shootCd -= dt;
       if (d < 230*SC && z.shootCd <= 0) {
         z.shootCd = 2.4;
@@ -3593,7 +3622,18 @@ function update(dt) {
         Sfx.spit();
       }
     } else {
-      moveCollide(z, z.x+Math.cos(a+wob)*z.speed*dt, z.y+Math.sin(a+wob)*z.speed*dt);
+      const ma = steerAngle(z, a) + (z.steerDir===0 ? wob : 0);   // rodea paredes; solo serpentea si va recto
+      moveCollide(z, z.x+Math.cos(ma)*z.speed*dt, z.y+Math.sin(ma)*z.speed*dt);
+    }
+    // desatasco: si apenas avanza estando lejos del jugador, está pegado a una
+    // pared/esquina -> invierte el sentido de rodeo para escapar por el otro lado
+    if (!z.isBoss) {
+      const moved = Math.hypot(z.x-z.px, z.y-z.py);
+      if (moved < z.speed*dt*0.35 && d > z.r+player.r+4) {
+        z.stuckT += dt;
+        if (z.stuckT > 0.45) { z.steerDir = z.steerDir <= 0 ? 1 : -1; z.stuckT = 0; }
+      } else z.stuckT = 0;
+      z.px = z.x; z.py = z.y;
     }
     // colisión: el zombie no puede meterse dentro del jugador
     const sep = z.r + player.r;
@@ -3936,11 +3976,12 @@ function draw() {
   // niebla permanente: visión reducida alrededor del jugador (con leve vaivén atmosférico)
   {
     const breathe = 1 + 0.06*Math.sin(auraT*0.7);   // el claro "respira" suavemente
-    const R = 185*SC * breathe;
-    const g = ctx.createRadialGradient(player.x, player.y, R*0.5, player.x, player.y, R*1.85);
-    g.addColorStop(0,   'rgba(10,13,18,0)');
-    g.addColorStop(0.7, 'rgba(8,11,16,0.55)');
-    g.addColorStop(1,   'rgba(6,9,14,0.88)');
+    const R = 120*SC * breathe;                       // claro más cerrado = más agobiante
+    const g = ctx.createRadialGradient(player.x, player.y, R*0.28, player.x, player.y, R*1.7);
+    g.addColorStop(0,    'rgba(8,11,16,0)');
+    g.addColorStop(0.4,  'rgba(7,10,15,0.6)');
+    g.addColorStop(0.7,  'rgba(5,8,12,0.9)');
+    g.addColorStop(1,    'rgba(3,5,9,1)');
     ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
   }
 
