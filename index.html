@@ -33,6 +33,14 @@
     --ui: 'VT323','Courier New',monospace;
     --pixel: 'Press Start 2P','VT323',monospace;
     --mono: 'VT323','Courier New',monospace;
+    /* ---- Controles tactiles (ajustables desde Ajustes) ---- */
+    --touch-scale: 1;       /* tamaño de sticks y botones */
+    --touch-raise: 0px;     /* cuanto se suben desde el borde inferior */
+    --touch-spread: 0px;    /* separacion extra de los sticks desde los bordes laterales */
+    --touch-opacity: 1;     /* opacidad de los controles */
+    --stick-size: calc(clamp(96px,24vmin,132px) * var(--touch-scale));
+    --knob-size:  calc(clamp(44px,11vmin,58px) * var(--touch-scale));
+    --tbtn-size:  calc(clamp(48px,12vmin,62px) * var(--touch-scale));
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body {
@@ -320,11 +328,27 @@
     padding: clamp(11px,2.2vmin,15px) clamp(13px,2.4vmin,17px); text-align: left;
   }
   .setting-row .lbl { font-family: var(--ui); text-transform:uppercase; font-size: clamp(15px,3vmin,20px); letter-spacing: 1px; color: #d6dee6; min-width: clamp(70px,16vmin,90px); }
-  #volRange { flex: 1; height: clamp(22px,4vmin,28px); accent-color: var(--toxic); cursor: pointer; }
-  #volVal { font-family: var(--mono); font-size: clamp(15px,3vmin,20px); color: var(--gold); min-width: 52px; text-align: right; }
+  #volRange, #tScaleRange, #tRaiseRange, #tSpreadRange, #tOpacityRange { flex: 1; height: clamp(22px,4vmin,28px); accent-color: var(--toxic); cursor: pointer; }
+  #volVal, #tScaleVal, #tRaiseVal, #tSpreadVal, #tOpacityVal { font-family: var(--mono); font-size: clamp(15px,3vmin,20px); color: var(--gold); min-width: 52px; text-align: right; }
   .setting-row .act { width: auto; margin: 0; padding: clamp(8px,1.7vmin,11px) clamp(13px,2.4vmin,18px); }
+  #touchSettings { display: flex; flex-direction: column; gap: clamp(8px,1.6vmin,14px); }
+  #touchSettings.hidden { display: none !important; }
+  .settings-sep {
+    font-family: var(--ui); text-transform: uppercase; letter-spacing: 1px;
+    font-size: clamp(13px,2.6vmin,17px); color: var(--gold);
+    border-top: 2px solid #2b333f; padding-top: clamp(6px,1.4vmin,12px); margin-top: clamp(2px,0.8vmin,6px);
+  }
 
   .hidden { display: none !important; }
+  /* Credito sutil abajo a la izquierda, sobre todo y sin estorbar al juego */
+  #credit {
+    position: fixed; z-index: 30; pointer-events: none;
+    left: calc(8px + env(safe-area-inset-left));
+    bottom: calc(8px + env(safe-area-inset-bottom));
+    font-family: var(--ui); font-size: clamp(10px,1.8vmin,13px);
+    color: var(--muted); opacity: .35; letter-spacing: .5px;
+    text-shadow: 1px 1px 0 rgba(0,0,0,.6); user-select: none;
+  }
   #toast {
     position: fixed; top: calc(clamp(52px,12vmin,78px) + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%) translateY(-6px);
     background: #11151c; border: 3px solid var(--toxic);
@@ -343,10 +367,11 @@
     position: fixed; inset: 0; z-index: 6;
     touch-action: none; -webkit-user-select: none; user-select: none;
     -webkit-touch-callout: none;
+    opacity: var(--touch-opacity);
   }
   .stick {
     position: fixed; transform: translate(-50%,-50%);
-    width: clamp(96px,24vmin,132px); height: clamp(96px,24vmin,132px);
+    width: var(--stick-size); height: var(--stick-size);
     border-radius: 50%; display: none; pointer-events: none;
     background: radial-gradient(circle, rgba(30,36,46,.42), rgba(12,15,20,.30));
     border: 2px solid rgba(255,255,255,.18);
@@ -355,7 +380,7 @@
   .stick.aim { background: radial-gradient(circle, rgba(60,24,24,.42), rgba(20,10,10,.3)); border-color: rgba(226,79,79,.5); }
   .stick > i {
     position: absolute; inset: 0; margin: auto;
-    width: clamp(44px,11vmin,58px); height: clamp(44px,11vmin,58px);
+    width: var(--knob-size); height: var(--knob-size);
     border-radius: 50%; border: 2px solid rgba(0,0,0,.45);
     background: radial-gradient(circle at 38% 32%, rgba(150,240,110,.9), rgba(111,226,111,.5));
     box-shadow: 0 3px 10px rgba(0,0,0,.5);
@@ -364,15 +389,15 @@
   /* Sticks FIJOS y siempre visibles: mover abajo-izquierda · apuntar/disparar abajo-derecha */
   #stickMove, #stickAim {
     display: block; transform: none;
-    bottom: calc(22px + env(safe-area-inset-bottom));
+    bottom: calc(22px + env(safe-area-inset-bottom) + var(--touch-raise));
   }
-  #stickMove { left:  calc(22px + env(safe-area-inset-left)); }
-  #stickAim  { right: calc(22px + env(safe-area-inset-right)); }
+  #stickMove { left:  calc(22px + env(safe-area-inset-left) + var(--touch-spread)); }
+  #stickAim  { right: calc(22px + env(safe-area-inset-right) + var(--touch-spread)); }
   #stickMove > i, #stickAim > i { transition: transform .05s linear; }
   .tbtn {
     position: fixed; z-index: 7;
-    width: clamp(48px,12vmin,62px); height: clamp(48px,12vmin,62px); border-radius: 50%;
-    font-family: var(--ui); font-size: clamp(16px,4vmin,22px); font-weight: 700; line-height: 1;
+    width: var(--tbtn-size); height: var(--tbtn-size); border-radius: 50%;
+    font-family: var(--ui); font-size: calc(clamp(16px,4vmin,22px) * var(--touch-scale)); font-weight: 700; line-height: 1;
     background: linear-gradient(180deg, rgba(28,34,43,.7), rgba(14,18,24,.7));
     color: #d6dee6; border: 1px solid rgba(255,255,255,.2);
     box-shadow: 0 6px 16px rgba(0,0,0,.45);
@@ -381,13 +406,16 @@
   }
   .tbtn:active { filter: brightness(1.25); }
   .tbtn.on { background: linear-gradient(180deg, #ffd45a, #e0a51f); color: #1a1300; border-color: #e0a51f; }
+  /* Vista previa en Ajustes: muestra los controles sobre el panel sin bloquear los sliders */
+  #touch.preview { display: block !important; z-index: 11; pointer-events: none; }
+  #touch.preview .tbtn { pointer-events: none; }
   #tPause  { top: calc(12px + env(safe-area-inset-top)); left: calc(12px + env(safe-area-inset-left)); }
   /* Recarga y correr: centro-abajo, para no solapar el stick de apuntado (abajo-derecha) */
-  #tReload { left: calc(50% - clamp(48px,12vmin,62px) - 8px); bottom: calc(20px + env(safe-area-inset-bottom)); }
-  #tRun    { left: calc(50% + 8px); bottom: calc(20px + env(safe-area-inset-bottom)); }
+  #tReload { left: calc(50% - var(--tbtn-size) - 8px); bottom: calc(20px + env(safe-area-inset-bottom) + var(--touch-raise)); }
+  #tRun    { left: calc(50% + 8px); bottom: calc(20px + env(safe-area-inset-bottom) + var(--touch-raise)); }
   /* En movil, los vitales se corren a la derecha del boton de pausa */
   @media (pointer: coarse) {
-    .hud-vitals { left: calc(env(safe-area-inset-left) + 13px + clamp(48px,12vmin,62px) + 10px); }
+    .hud-vitals { left: calc(env(safe-area-inset-left) + 13px + var(--tbtn-size) + 10px); }
   }
 
   /* ---- Menu: estadisticas ---- */
@@ -413,6 +441,7 @@
 </head>
 <body>
 <div id="wrap"><canvas id="game" width="1280" height="720"></canvas></div>
+<div id="credit">created by AnhuarRuiz</div>
 
 <div id="hud" class="hidden">
   <!-- Vitales: arriba-izquierda -->
@@ -497,8 +526,7 @@
   <p>
     Si los activas, cada oleada normal trae una <b>mutación</b> al azar:<br>
     <span class="key">🧟 Horda</span> · <span class="key">⚡ Frenesí</span> ·
-    <span class="key">🛡️ Coriáceos</span> · <span class="key">🌫️ Niebla</span> ·
-    <span class="key">💰 Botín doble</span><br>
+    <span class="key">🛡️ Coriáceos</span> · <span class="key">💰 Botín doble</span><br>
     Más caos y más riesgo... pero también más recompensa.
   </p>
   <div class="row">
@@ -556,6 +584,30 @@
     <div class="setting-row">
       <span class="lbl">Silencio</span>
       <button class="act equip" id="muteToggle" style="margin:0;width:auto">🔊 Sonido</button>
+    </div>
+    <div id="touchSettings" class="hidden">
+      <div class="settings-sep">🎮 CONTROLES TÁCTILES</div>
+      <div class="setting-row">
+        <span class="lbl">Tamaño</span>
+        <input type="range" id="tScaleRange" min="70" max="150" step="5" value="100" aria-label="Tamaño de controles">
+        <span id="tScaleVal">100%</span>
+      </div>
+      <div class="setting-row">
+        <span class="lbl">Altura</span>
+        <input type="range" id="tRaiseRange" min="0" max="180" step="5" value="0" aria-label="Altura de controles">
+        <span id="tRaiseVal">0px</span>
+      </div>
+      <div class="setting-row">
+        <span class="lbl">Separación</span>
+        <input type="range" id="tSpreadRange" min="0" max="120" step="5" value="0" aria-label="Separación lateral de los sticks">
+        <span id="tSpreadVal">0px</span>
+      </div>
+      <div class="setting-row">
+        <span class="lbl">Opacidad</span>
+        <input type="range" id="tOpacityRange" min="30" max="100" step="5" value="100" aria-label="Opacidad de controles">
+        <span id="tOpacityVal">100%</span>
+      </div>
+      <button class="act equip" id="tResetBtn" style="margin:2px 0 0;width:auto;align-self:flex-start">↺ Restablecer</button>
     </div>
   </div>
   <button class="btn ghost" id="settingsBack" style="margin-top:6px">VOLVER</button>
@@ -639,6 +691,7 @@ const MAX_GADGETS = 2;
 const SAVE_KEY = 'pixelZombiesSave_v2';
 const UNLOCK_ALL = true;   // DEV: pon false para volver a la progresion normal (desbloqueo por nivel)
 let save;
+function clampNum(v, lo, hi, def) { return (typeof v === 'number' && isFinite(v)) ? Math.max(lo, Math.min(hi, v)) : def; }
 function loadSave() {
   try { save = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch(e) { save = null; }
   if (!save || typeof save !== 'object') save = {};
@@ -653,6 +706,11 @@ function loadSave() {
   if (save.map === 'snow') save.map = 'city';   // mapa de nieve retirado
   save.volume   = (typeof save.volume === 'number') ? save.volume : 1;
   save.modifiers = save.modifiers ?? false;   // preferencia de oleadas con modificadores
+  // ajustes de controles tactiles (movil): tamaño, altura y opacidad
+  save.touchScale   = clampNum(save.touchScale,   0.7, 1.5, 1);
+  save.touchRaise   = clampNum(save.touchRaise,   0,   180, 0);
+  save.touchSpread  = clampNum(save.touchSpread,  0,   120, 0);
+  save.touchOpacity = clampNum(save.touchOpacity, 0.3, 1,   1);
   // perk equipado (1) y gadgets equipados (hasta 2)
   save.perk     = (save.perk === undefined) ? 'dash'
                   : (save.perk && PERKS[save.perk] ? save.perk : null);
@@ -678,14 +736,22 @@ function xpForNext(lvl) { return 100 + lvl * lvl * 22; }
 // ====================== COSMÉTICOS (skins) ======================
 // Solo datos: cada skin define overrides de paleta (jugador/arma) o colores (balas).
 // 'default' es gratis y siempre lo tienes. Se aplican recoloreando los sprites.
+// fx (épicos): aura=halo de luz pulsante, emit=color de partículas, rate=part/seg,
+//   rise=flotan hacia arriba, ring=anillo orbital, alpha=opacidad del jugador (espectro).
 const PLAYER_SKINS = {
   default:  { name:'Superviviente', price:0,    pal:{} },
   crimson:  { name:'Carmesí',       price:700,  pal:{ S:'#b23a2e', s:'#7e2820', R:'#3a1714', e:'#2a100e', J:'#2a201c', j:'#1b1512' } },
   military: { name:'Militar',       price:900,  pal:{ S:'#566b3a', s:'#3d4e29', R:'#3a3a22', e:'#2a2a18', J:'#39341f', j:'#2a2618' } },
   arctic:   { name:'Ártico',        price:1100, pal:{ S:'#e6ecf0', s:'#aebccb', R:'#3a6d8f', e:'#2a5070', J:'#cdd5da', j:'#9fb0bb' } },
   shadow:   { name:'Sombra',        price:1400, pal:{ S:'#2a2d35', s:'#1c1e24', R:'#6a3aa0', e:'#4a2870', J:'#1a1c22', j:'#101216', H:'#1a1c22', h:'#101216' } },
-  gold:     { name:'Dorado',        price:2200, pal:{ S:'#e0b94a', s:'#b8862a', R:'#7a5a12', e:'#5a3f0c', J:'#3a3024', j:'#2a2218' } },
+  gold:     { name:'Dorado',        price:2200, pal:{ S:'#e0b94a', s:'#b8862a', R:'#7a5a12', e:'#5a3f0c', J:'#3a3024', j:'#2a2218' }, fx:{ aura:'#ffd24a', emit:'#ffe89a', rate:8, rise:true } },
+  inferno:  { name:'Infierno',      price:3200, pal:{ S:'#2a1410', s:'#1a0c08', R:'#e0531c', e:'#a83410', J:'#241410', j:'#160c08', H:'#401408', h:'#ff8a3a' }, fx:{ aura:'#ff5a1f', emit:'#ffb24a', rate:24, rise:true } },
+  frost:    { name:'Escarcha',      price:3200, pal:{ S:'#cfe8f5', s:'#9fc4da', R:'#3aa6d8', e:'#2a7aa8', J:'#5a86a0', j:'#3f6378', H:'#6aa8c8', h:'#cfeeff' }, fx:{ aura:'#7fd8ff', emit:'#dffaff', rate:16, rise:true } },
+  void:     { name:'Abismo',        price:3800, pal:{ S:'#241830', s:'#160e1f', R:'#7a2ad0', e:'#561c9a', J:'#1a1226', j:'#0f0a17', H:'#2a1838', h:'#b06aff' }, fx:{ aura:'#9a3aff', emit:'#d9b6ff', rate:18, rise:true } },
+  neon:     { name:'Neón',          price:4200, pal:{ S:'#16201a', s:'#0e1611', R:'#1aff8a', e:'#0fbf63', J:'#10160f', j:'#0a0e0a', H:'#16201a', h:'#39ff9a' }, fx:{ aura:'#39ff9a', emit:'#aaffd0', rate:10, ring:true } },
+  phantom:  { name:'Espectro',      price:4800, pal:{ S:'#aed6ec', s:'#7fb0cc', R:'#bfe4f5', e:'#8fc0da', J:'#7da8c2', j:'#5a86a0', H:'#9fc8e0', h:'#e6f6ff' }, fx:{ aura:'#bfe9ff', emit:'#cfeaff', rate:8, rise:true, alpha:0.5 } },
 };
+// glow: color del halo emisivo del arma (shadowBlur al dibujarla).
 const WEAPON_SKINS = {
   default:  { name:'Acero',    price:0,    pal:{} },
   gold:     { name:'Oro',      price:1000, pal:{ d:'#6a4a10', m:'#a8791f', M:'#e0b94a', h:'#ffe89a' } },
@@ -693,14 +759,22 @@ const WEAPON_SKINS = {
   toxic:    { name:'Tóxico',   price:1200, pal:{ d:'#1a2a10', m:'#3d6b1a', M:'#6f9b3a', h:'#b6e24a' } },
   cobalt:   { name:'Cobalto',  price:1200, pal:{ d:'#0e1c33', m:'#1f3f6d', M:'#3a6db8', h:'#8fc1ff' } },
   bone:     { name:'Hueso',    price:1500, pal:{ d:'#3a352a', m:'#7a7060', M:'#cfc6b0', h:'#f0ead6' } },
+  plasma:   { name:'Plasma',   price:2600, pal:{ d:'#0a1c2e', m:'#15527a', M:'#2a9ad8', h:'#8fe0ff' }, glow:'#3ac8ff' },
+  inferno:  { name:'Infierno', price:2600, pal:{ d:'#2a0a06', m:'#7a1f0c', M:'#e0531c', h:'#ffb24a' }, glow:'#ff6a1f' },
+  abyss:    { name:'Abismo',   price:3000, pal:{ d:'#180a2a', m:'#4a1f8a', M:'#8a3ad8', h:'#d9b6ff' }, glow:'#a04aff' },
+  venom:    { name:'Veneno',   price:3000, pal:{ d:'#0a2014', m:'#0f7a3a', M:'#1aff8a', h:'#aaffd0' }, glow:'#2aff8a' },
 };
+// trail=estela luminosa, glow=halo aditivo, rainbow=color cíclico.
 const BULLET_SKINS = {
-  default:  { name:'Plomo',   price:0,   edge:'#caa53a', core:'#ffe89a' },
-  plasma:   { name:'Plasma',  price:500, edge:'#2f86c8', core:'#bff0ff' },
-  toxic:    { name:'Tóxico',  price:500, edge:'#5a8a2a', core:'#cdee8a' },
-  ember:    { name:'Brasa',   price:700, edge:'#d2541f', core:'#ffd76a' },
-  crimson:  { name:'Carmesí', price:700, edge:'#a3242a', core:'#ff8a6a' },
-  void:     { name:'Vacío',   price:900, edge:'#6a3aa0', core:'#d9b6ff' },
+  default:  { name:'Plomo',    price:0,    edge:'#caa53a', core:'#ffe89a' },
+  plasma:   { name:'Plasma',   price:500,  edge:'#2f86c8', core:'#bff0ff', glow:true },
+  toxic:    { name:'Tóxico',   price:500,  edge:'#5a8a2a', core:'#cdee8a', glow:true },
+  ember:    { name:'Brasa',    price:700,  edge:'#d2541f', core:'#ffd76a', glow:true, trail:true },
+  crimson:  { name:'Carmesí',  price:700,  edge:'#a3242a', core:'#ff8a6a', glow:true },
+  void:     { name:'Vacío',    price:900,  edge:'#6a3aa0', core:'#d9b6ff', glow:true, trail:true },
+  laser:    { name:'Láser',    price:1400, edge:'#ff2a4a', core:'#ffe0e6', glow:true, trail:true },
+  star:     { name:'Estelar',  price:1600, edge:'#ffd24a', core:'#fffbe0', glow:true, trail:true },
+  rainbow:  { name:'Arcoíris', price:2200, edge:'#ff5a9a', core:'#ffffff', glow:true, trail:true, rainbow:true },
 };
 
 loadSave();
@@ -879,7 +953,10 @@ function buildPlayerSprite(skinId) {
   return spriteHD(PLAYER_ROWS, pal);
 }
 let playerSprite = buildPlayerSprite();
-function applyPlayerSkin() { playerSprite = buildPlayerSprite(); }
+// rgba a partir de un hex (#rrggbb) con alpha — para halos/auras aditivas
+function hexA(hex, a) { const n = parseInt(hex.slice(1), 16); return `rgba(${n>>16&255},${n>>8&255},${n&255},${a})`; }
+let playerFx = (PLAYER_SKINS[save.skinPlayer] || {}).fx || null;
+function applyPlayerSkin() { playerSprite = buildPlayerSprite(); playerFx = (PLAYER_SKINS[save.skinPlayer] || {}).fx || null; }
 // Zombie normal
 const zombieA = spriteHD([
   '        zzzzzzzz        ',
@@ -1103,112 +1180,175 @@ for (const k in ZTYPES) { ZTYPES[k].speed *= SC; ZTYPES[k].r *= SC; }
 
 // ====================== ARTE DE ARMAS (pixel-art por arma) ======================
 const GP = {
-  d:'#20242b', m:'#3e444c', M:'#646c76', h:'#9aa3ad',
-  g:'#16191e', p:'#2a2e35', w:'#7c5230', W:'#9a6a3e',
+  d:'#20242b', m:'#3e444c', M:'#646c76', h:'#9aa3ad',   // rampa metal (las skins recolorean estos 4)
+  g:'#16191e', p:'#2a2e35', P:'#3c424c', i:'#0e1116',    // grip / polimero claro / sombra profunda
+  w:'#7c5230', W:'#9a6a3e', u:'#5a3a22',                 // madera (claro/medio/oscuro)
   o:'#d2a73c', r:'#c1352b', y:'#e0b94a', f:'#ff7a1f',
-  c:'#74c6ff', b:'#36421f', B:'#4e5e2a', t:'#233042', n:'#0c0e11',
+  c:'#74c6ff', b:'#36421f', B:'#4e5e2a', t:'#33526e', n:'#0c0e11',  // c/t = cristal y tubo de mira
 };
+// Arte de armas en alta resolucion (se construye a escala 1; ver buildGun).
+// Convencion: canon a la derecha, culata/empunadura abajo-izquierda.
+// Rampa de luz: h (brillo) arriba -> M -> m -> d (sombra) abajo; n/i = lineas oscuras internas.
 const WART = {
   pistol: [
-    '  MMMMd ',
-    ' dMMMMMd',
-    ' dmmmmd ',
-    'ggdmmd  ',
-    'gggdd   ',
-    ' ggg    ',
-    '  gg    ',
+    '                 ',
+    '          n      ',
+    '    hhhhhhhMh     ',
+    '   hMMMMMMMMMm    ',
+    '   dMMMMMMMMMm    ',
+    '   dnnnnnnnnMd    ',
+    '   dMMMMMMMMd     ',
+    '   dMMmmmmmd      ',
+    '   pMMmiind       ',
+    '   pgPgm          ',
+    '   pgPgg          ',
+    '   pgPgg          ',
+    '    nggn          ',
+    '     nn           ',
   ],
   revolver: [
-    '   MMMMd  ',
-    '  dMMMMMd ',
-    '  dmMMmd  ',
-    'ggdmMMmd  ',
-    'gggdMmd   ',
-    ' gggdd    ',
-    '  ggg     ',
+    '                  ',
+    '     hhhhhhhh      ',
+    '    hMMMMMMMMm     ',
+    '    dnnnnnnnMm     ',
+    '   dMMMMMMMMMd     ',
+    '   dMhhhMMMMd      ',
+    '   dMhhhMMMd       ',
+    '   pMniMMMd        ',
+    '   puWWwm          ',
+    '   puWwwn          ',
+    '   puwwwn          ',
+    '   puwwn           ',
+    '    nwn            ',
+    '     n             ',
   ],
   smg: [
-    '    MMMMMd ',
-    '  ddMMMMMd ',
-    '  dmmmmmmd ',
-    'ggdmpppmd  ',
-    'gggdpmd    ',
-    '  gpmpg    ',
-    '  gpppg    ',
-    '  gppg     ',
+    '                     ',
+    '              n      ',
+    '      hhhhhhhhMh      ',
+    '    hMMMMMMMMMMMMm    ',
+    '   PMMMMMMMMMMMMnd    ',
+    '   PnnnnnnnnnMMd      ',
+    '   dMMMMMMMMMMd       ',
+    '   dMMm   mMMd        ',
+    '   pgPg   pmmd        ',
+    '   pgPg   pppd        ',
+    '   pgPg   pppp        ',
+    '    ng    pppp        ',
+    '          pppp        ',
+    '          pPpp        ',
+    '          nnnn        ',
   ],
   carbine: [
-    '     mMMMMMn',
-    '  ddppppppMd',
-    '  dppppppppd',
-    'gggpppmppd  ',
-    'gggdpmpd    ',
-    '  gpmpg     ',
-    '  gpppg     ',
-    '  ggg       ',
+    '                          ',
+    '                  n       ',
+    '       hhhhhhhhhhhMh       ',
+    '   PPPMMMMMMMMMMMmmmmmMn   ',
+    '   PMMMMMMMMMMMMMMnnnnnd   ',
+    '   PnnnnnnnnnnMMMd         ',
+    '   dMMMMMMMMMMMMd          ',
+    '  ddMMm    mMMMd           ',
+    '  pgPg     pmmd            ',
+    '  pgPg     pppd            ',
+    '  pgPg     pppp            ',
+    '   ng      pppp            ',
+    '           pPpp            ',
+    '           nnnn            ',
   ],
   shotgun: [
-    '     MMMMMMMn',
-    '  wwwMMMMMMMd',
-    '  wwmmmmmmmd ',
-    'wwwwwwwmmd   ',
-    'wwwww   d    ',
-    ' www         ',
-    '  w          ',
+    '                            ',
+    '          hhhhhhhhhhhhhhhh   ',
+    '       wwMMMMMMMMMMMMMMMMMn  ',
+    '      uWWMMMMMMMMMMMMMnnnnd  ',
+    '     uWWWnnnnnnnnnnnnMMMd    ',
+    '    uWWWwMMMMMMMMMMMMMMd     ',
+    '   uWWwwmmmmmmmmmmmmmmd      ',
+    '   uwwwmddddddddddddddd      ',
+    '   nuwwm                    ',
+    '    nuwm                    ',
+    '     nwn                    ',
+    '      n                     ',
   ],
   rifle: [
-    '      mMMMMMMMMn',
-    '   dddbbbbbbMMd ',
-    '  dbbbbbbbbbmd  ',
-    'gggbbbpbbbd     ',
-    'gggdbpd         ',
-    '  gbpbg         ',
-    '  gpppg         ',
-    '  gppg          ',
+    '                              ',
+    '                      n       ',
+    '            hhhhhhhhhhMh       ',
+    '   PPPPMMMMMMMMMMMMMMmmmmmMn   ',
+    '   PMMMMMMMMMMMMMMMMMnnnnnnd   ',
+    '   PnnnnnnnnnnnnMMMMd          ',
+    '   dMMMMMMMMMMMMMMMd           ',
+    '  ddMMm    iiMMMMd             ',
+    '  pgPg     pmmd                ',
+    '  pgPg    ipppi                ',
+    '  pgPg    ppppp                ',
+    '   ng     ipppi               ',
+    '           ppp                ',
+    '           nnn                ',
   ],
   ashotgun: [
-    '     dMMMMMMn',
-    '  dddMMMMMMd ',
-    '  dmmmmmmmd  ',
-    'gggdmMMmmd   ',
-    'gggdMMMMd    ',
-    '  gdMMMd     ',
-    '  gdMd       ',
-    '  ggg        ',
+    '                            ',
+    '          hhhhhhhhhhhhhh     ',
+    '   PPPMMMMMMMMMMMMMMMMMMn    ',
+    '   PMMMMMMMMMMMMMMnnnnnnd    ',
+    '   PnnnnnnnnnnMMMd           ',
+    '   dMMMMMMMMMMMMd            ',
+    '  ddMMm   iiMMd              ',
+    '  pgPg    ppppp              ',
+    '  pgPg    pPPPp              ',
+    '  pgPg    ppppp              ',
+    '   ng     ppppp              ',
+    '          ppppp              ',
+    '          nnnnn             ',
   ],
   sniper: [
-    '       cccc        ',
-    '      cMMMMc        ',
-    '   tttMMMMtttttttn  ',
-    '  ttttttttttMMd     ',
-    'gggttttttd          ',
-    'gggdtd              ',
-    '  gg                ',
-    '  gg                ',
+    '                                       ',
+    '            tttttttttttttt             ',
+    '           tcccccccccccccct            ',
+    '          ttMMMMMMMMMMMMMMtt           ',
+    '          dMt          tMd             ',
+    '   PPPPMMMMMMMMMMMMMMMMMMMmmmmmmmmmMn   ',
+    '   PMMMMMMMMMMMMMMMMMMMMMnnnnnnnnnnnd   ',
+    '   PnnnnnnnnnnnnnnMMMMMd                ',
+    '   dMMMMMMMMMMMMMMMMMMd                 ',
+    '  ddMMm        iMMMMd                   ',
+    '  pgPg         pmmd                     ',
+    '  pgPg     n   ppp   n                  ',
+    '   ng       n  nnn  n                   ',
+    '             n     n                    ',
   ],
   lmg: [
-    '    mMMMMMMMMMn ',
-    '  dddMMMMMMMmd  ',
-    '  dmddddddmd    ',
-    '  dmpppppppd    ',
-    'ggdmpppppppd    ',
-    'gggdppppppd     ',
-    '  gddmmd        ',
-    '  M   M         ',
-    ' M     M        ',
+    '                                   ',
+    '            hhhhhhhhhhhhhhhh        ',
+    '   PPPMMMMMMMMMMMMMMMMMMmmmmmmmmMn  ',
+    '   PMMMMMMMMMMMMMMMMMnininininind   ',
+    '   PnnnnnnnnnnnnnMMMMd              ',
+    '   dMMMMMMMMMMMMMMMMMd              ',
+    '  ddMMm    iiiMMMMMMd               ',
+    '  pgPg     ppppppd                  ',
+    '  pgPg     pPPPPpd                  ',
+    '  pgPg     ppppppd                  ',
+    '   ng      ppppppd                  ',
+    '           nnnnnn                   ',
+    '       n          n                 ',
+    '      n            n                ',
+    '     n              n               ',
   ],
 };
 function padRows(rows) { const w = Math.max(...rows.map(r => r.length)); return rows.map(r => r.padEnd(w, ' ')); }
 function weaponPalette() { return Object.assign({}, GP, (WEAPON_SKINS[save.skinWeapon] || WEAPON_SKINS.default).pal); }
-function buildGun(rows) { return outline(makeSprite(padRows(rows), weaponPalette(), SC), '#0b0d10'); }
-function applyWeaponSkin() { for (const id in WART) if (WEAPONS[id]) WEAPONS[id].spr = buildGun(WART[id]); }
+// Se construye a escala 1: el arte ya es de alta resolucion (doble densidad de pixel)
+// y asi conserva el mismo tamano en pantalla que los sprites antiguos a SC.
+function buildGun(rows) { return outline(makeSprite(padRows(rows), weaponPalette(), 1), '#0b0d10'); }
+let weaponGlow = (WEAPON_SKINS[save.skinWeapon] || {}).glow || null;
+function applyWeaponSkin() { for (const id in WART) if (WEAPONS[id]) WEAPONS[id].spr = buildGun(WART[id]);
+  weaponGlow = (WEAPON_SKINS[save.skinWeapon] || {}).glow || null; }
 applyWeaponSkin();   // construye los sprites con la skin guardada
 
-// color de las balas (según skin equipada)
-let bulletEdge = '#caa53a', bulletCore = '#ffe89a';
+// color y efectos de las balas (según skin equipada)
+let bulletEdge = '#caa53a', bulletCore = '#ffe89a', bulletFx = null;
 function applyBulletSkin() {
   const b = BULLET_SKINS[save.skinBullet] || BULLET_SKINS.default;
-  bulletEdge = b.edge; bulletCore = b.core;
+  bulletEdge = b.edge; bulletCore = b.core; bulletFx = b;
 }
 applyBulletSkin();
 
@@ -2653,7 +2793,6 @@ const WAVE_MODS = {
   horde:  { name:'HORDA',     icon:'🧟', desc:'Vienen muchos más',   sizeMul:1.6 },
   frenzy: { name:'FRENESÍ',   icon:'⚡', desc:'Zombies muy veloces', spdMul:1.45 },
   tough:  { name:'CORIÁCEOS', icon:'🛡️', desc:'Aguantan más balas',  hpMul:1.7 },
-  fog:    { name:'NIEBLA',    icon:'🌫️', desc:'Visión reducida',     fog:true },
   bounty: { name:'BOTÍN',     icon:'💰', desc:'Doble dinero y XP',   rewardMul:2, sizeMul:1.2 },
 };
 const WAVE_MOD_ORDER = Object.keys(WAVE_MODS);
@@ -3031,8 +3170,19 @@ const touchInput = { moveX:0, moveY:0, moveActive:false, aimX:0, aimY:0, aimActi
 const elTouch = document.getElementById('touch');
 const stickMove = document.getElementById('stickMove');
 const stickAim  = document.getElementById('stickAim');
-const STICK_R = 58;          // radio maximo del stick (px)
+let STICK_R = 58 * (save.touchScale || 1);   // radio maximo del stick (px), escala con el ajuste de tamaño
 let moveId = null, aimId = null, moveOrigin = null, aimOrigin = null;
+
+// aplica los ajustes de controles tactiles (tamaño/altura/opacidad) via variables CSS
+function applyTouchSettings() {
+  const r = document.documentElement.style;
+  r.setProperty('--touch-scale', save.touchScale);
+  r.setProperty('--touch-raise', save.touchRaise + 'px');
+  r.setProperty('--touch-spread', save.touchSpread + 'px');
+  r.setProperty('--touch-opacity', save.touchOpacity);
+  STICK_R = 58 * save.touchScale;
+}
+applyTouchSettings();
 
 // mueve solo la "perilla" (i) del stick; la base queda fija en su sitio
 function placeKnob(el, dx, dy) { el.firstElementChild.style.transform = `translate(${dx}px, ${dy}px)`; }
@@ -3100,7 +3250,8 @@ if (IS_TOUCH) {
   if (help) help.innerHTML =
     '<span class="key">Joystick izq.</span> moverse · <span class="key">Joystick der.</span> apuntar y disparar · ' +
     'botones <span class="key">&#10227;</span> recargar · <span class="key">&#187;</span> correr · <span class="key">II</span> pausa · ' +
-    'toca las habilidades (perk y gadgets) abajo en el centro';
+    'toca las habilidades (perk y gadgets) abajo en el centro · ' +
+    'ajusta tamaño, altura y opacidad de los controles en <span class="key">AJUSTES</span>';
 }
 
 function reload() {
@@ -3339,7 +3490,24 @@ function onLevelUp() {
 }
 
 // ====================== UPDATE ======================
+let auraT = 0, auraEmit = 0;
 function update(dt) {
+  // efectos cosméticos: aura pulsante + partículas de la skin del jugador
+  auraT += dt;
+  if (playerFx && playerFx.emit) {
+    auraEmit += (playerFx.rate || 10) * dt;
+    while (auraEmit >= 1) {
+      auraEmit -= 1;
+      const a = Math.random()*7, rr = (5+Math.random()*9)*SC;
+      particles.push({
+        x: player.x + Math.cos(a)*rr, y: player.y + Math.sin(a)*rr,
+        vx: (Math.random()-0.5)*22*SC,
+        vy: playerFx.rise ? -(18+Math.random()*34)*SC : (Math.random()-0.5)*22*SC,
+        life: 0.45+Math.random()*0.45, col: playerFx.emit,
+        size: (1+(Math.random()*2|0))*SC, glow: true,
+      });
+    }
+  }
   let dx=0, dy=0;
   if (touchInput.moveActive) { dx = touchInput.moveX; dy = touchInput.moveY; }   // joystick movil
   else { if (keys['w']) dy--; if (keys['s']) dy++; if (keys['a']) dx--; if (keys['d']) dx++; }
@@ -3376,7 +3544,8 @@ function update(dt) {
   handleTransitions();                                // cambio de región / puertas
   updateCamera();                                     // la vista sigue al jugador (con zoom)
   if (touchInput.aimActive) player.ang = Math.atan2(touchInput.aimY, touchInput.aimX);  // joystick movil
-  else player.ang = Math.atan2(screenToWorldY(mouse.y)-player.y, screenToWorldX(mouse.x)-player.x);
+  else if (!IS_TOUCH) player.ang = Math.atan2(screenToWorldY(mouse.y)-player.y, screenToWorldX(mouse.x)-player.x);
+  // en movil, al soltar el stick de apuntar la mira se queda en el ultimo angulo (no vuelve al raton)
 
   if (player.fireCd > 0) player.fireCd -= dt;
   if (player.hurtFlash > 0) player.hurtFlash -= dt;
@@ -3622,7 +3791,17 @@ function draw() {
     ctx.fillStyle='rgba(90,15,15,0.5)';
     ctx.fillRect(dc.x-2*SC, dc.y-2*SC, 4*SC, 4*SC);
   }
-  for (const p of particles) { ctx.fillStyle = p.col; ctx.fillRect(p.x|0, p.y|0, p.size, p.size); }
+  for (const p of particles) {
+    if (p.glow) {
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = Math.max(0, Math.min(1, p.life*2.2));
+      ctx.fillStyle = p.col; const s = p.size;
+      ctx.fillRect((p.x-s)|0, (p.y-s)|0, s*3, s*3);
+      ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+    } else {
+      ctx.fillStyle = p.col; ctx.fillRect(p.x|0, p.y|0, p.size, p.size);
+    }
+  }
 
   // cajas/contenedores destructibles
   for (const p of curRegion.props) if (p.alive) drawProp(p);
@@ -3672,7 +3851,10 @@ function draw() {
   }
 
   for (const z of zombies) drawEntity(z.sprite, z.x, z.y, z.ang, z.hitFlash>0, z.scale);
+  drawPlayerAura();
+  if (playerFx && playerFx.alpha) ctx.globalAlpha = playerFx.alpha;
   drawEntity(playerSprite, player.x, player.y, player.ang, player.hurtFlash>0);
+  ctx.globalAlpha = 1;
 
   // arma equipada, o cuchillo si no quedan balas
   const wp = equippedWeapon();
@@ -3684,7 +3866,9 @@ function draw() {
     ctx.fillStyle = '#3a2a1a'; ctx.fillRect(3*SC, -SC, 3*SC, 2*SC);  // mango
     ctx.fillStyle = '#c2c7cf'; ctx.fillRect(6*SC, -SC, 6*SC, 2*SC);  // hoja
   } else if (wp.spr) {
+    if (weaponGlow) { ctx.shadowColor = weaponGlow; ctx.shadowBlur = 7*SC; }
     ctx.drawImage(wp.spr, 2*SC, -(wp.spr.height >> 1));
+    ctx.shadowBlur = 0;
   } else {
     ctx.fillStyle = '#14161b'; ctx.fillRect(3*SC, -2*SC, wp.barrel+3, 5*SC); // contorno
     ctx.fillStyle = wp.col;    ctx.fillRect(4*SC, -SC, wp.barrel, 3*SC);
@@ -3701,10 +3885,25 @@ function draw() {
     ctx.stroke();
   }
 
-  // balas con contorno
+  // balas con contorno (+ estela / glow / arcoíris según skin)
   for (const b of bullets) {
-    ctx.fillStyle=bulletEdge; ctx.fillRect(b.x-2*SC, b.y-2*SC, 4*SC, 4*SC);
-    ctx.fillStyle=bulletCore; ctx.fillRect(b.x-SC, b.y-SC, 2*SC, 2*SC);
+    let edge = bulletEdge, core = bulletCore;
+    if (bulletFx && bulletFx.rainbow) {
+      const hue = ((b.x+b.y)*0.6 + performance.now()*0.4) % 360;
+      core = `hsl(${hue},100%,82%)`; edge = `hsl(${hue},95%,55%)`;
+    }
+    if (bulletFx && bulletFx.trail) {
+      ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.5;
+      ctx.strokeStyle = edge; ctx.lineWidth = 3*SC; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(b.x - b.vx*0.045, b.y - b.vy*0.045); ctx.lineTo(b.x, b.y); ctx.stroke();
+      ctx.restore();
+    }
+    if (bulletFx && bulletFx.glow) {
+      ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.55;
+      ctx.fillStyle = core; ctx.fillRect(b.x-3*SC, b.y-3*SC, 6*SC, 6*SC); ctx.restore();
+    }
+    ctx.fillStyle=edge; ctx.fillRect(b.x-2*SC, b.y-2*SC, 4*SC, 4*SC);
+    ctx.fillStyle=core; ctx.fillRect(b.x-SC, b.y-SC, 2*SC, 2*SC);
   }
 
   // escupitajos de ácido (y escombros del jefe)
@@ -3734,12 +3933,14 @@ function draw() {
     ctx.fillStyle='#d14b4b'; ctx.fillRect(z.x-bw/2, z.y-z.r-6*SC, bw*(z.hp/z.maxHp), 2*SC);
   }
 
-  // niebla (modificador): visión reducida alrededor del jugador
-  if (curMod && curMod.fog) {
-    const R = 150*SC;
-    const g = ctx.createRadialGradient(player.x, player.y, R*0.45, player.x, player.y, R*1.8);
-    g.addColorStop(0, 'rgba(8,11,16,0)');
-    g.addColorStop(1, 'rgba(6,9,14,0.93)');
+  // niebla permanente: visión reducida alrededor del jugador (con leve vaivén atmosférico)
+  {
+    const breathe = 1 + 0.06*Math.sin(auraT*0.7);   // el claro "respira" suavemente
+    const R = 185*SC * breathe;
+    const g = ctx.createRadialGradient(player.x, player.y, R*0.5, player.x, player.y, R*1.85);
+    g.addColorStop(0,   'rgba(10,13,18,0)');
+    g.addColorStop(0.7, 'rgba(8,11,16,0.55)');
+    g.addColorStop(1,   'rgba(6,9,14,0.88)');
     ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
   }
 
@@ -3837,6 +4038,28 @@ function drawPickup(type, x, y) {
   }
 }
 
+// aura cosmética del jugador: halo aditivo pulsante (+ anillo orbital para Neón)
+function drawPlayerAura() {
+  if (!playerFx || !playerFx.aura) return;
+  const pulse = 0.78 + 0.22*Math.sin(auraT*5);
+  const r = 28*SC*pulse;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const g = ctx.createRadialGradient(player.x, player.y, 2*SC, player.x, player.y, r);
+  g.addColorStop(0,   hexA(playerFx.aura, 0.42*pulse));
+  g.addColorStop(0.5, hexA(playerFx.aura, 0.16*pulse));
+  g.addColorStop(1,   hexA(playerFx.aura, 0));
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(player.x, player.y, r, 0, 7); ctx.fill();
+  if (playerFx.ring) {
+    ctx.strokeStyle = hexA(playerFx.aura, 0.55);
+    ctx.lineWidth = 1.6*SC;
+    ctx.beginPath();
+    for (let i=0;i<3;i++){ const a = auraT*2.2 + i*2.094; ctx.arc(player.x, player.y, 17*SC, a, a+1.3); }
+    ctx.stroke();
+  }
+  ctx.restore();
+}
 function drawEntity(sprite, x, y, ang, flash, scale) {
   scale = scale || 1;
   const w = sprite.width*scale, h = sprite.height*scale;
@@ -3949,11 +4172,30 @@ const elSettings = document.getElementById('settings');
 const volRange = document.getElementById('volRange');
 const volVal = document.getElementById('volVal');
 const muteToggle = document.getElementById('muteToggle');
+const touchSettings = document.getElementById('touchSettings');
+const tScaleRange = document.getElementById('tScaleRange');
+const tScaleVal = document.getElementById('tScaleVal');
+const tRaiseRange = document.getElementById('tRaiseRange');
+const tRaiseVal = document.getElementById('tRaiseVal');
+const tSpreadRange = document.getElementById('tSpreadRange');
+const tSpreadVal = document.getElementById('tSpreadVal');
+const tOpacityRange = document.getElementById('tOpacityRange');
+const tOpacityVal = document.getElementById('tOpacityVal');
 let settingsReturn = 'menu';
 function refreshSettingsUI() {
   volRange.value = Math.round(Sfx.volume * 100);
   volVal.textContent = volRange.value + '%';
   muteToggle.textContent = Sfx.muted ? '🔇 Silenciado' : '🔊 Sonido';
+  // controles tactiles: solo en pantallas tactiles
+  touchSettings.classList.toggle('hidden', !IS_TOUCH);
+  tScaleRange.value = Math.round(save.touchScale * 100);
+  tScaleVal.textContent = tScaleRange.value + '%';
+  tRaiseRange.value = Math.round(save.touchRaise);
+  tRaiseVal.textContent = tRaiseRange.value + 'px';
+  tSpreadRange.value = Math.round(save.touchSpread);
+  tSpreadVal.textContent = tSpreadRange.value + 'px';
+  tOpacityRange.value = Math.round(save.touchOpacity * 100);
+  tOpacityVal.textContent = tOpacityRange.value + '%';
 }
 function openSettings(from) {
   settingsReturn = from;
@@ -3961,9 +4203,11 @@ function openSettings(from) {
   elPause.classList.add('hidden');
   refreshSettingsUI();
   elSettings.classList.remove('hidden');
+  if (IS_TOUCH) elTouch.classList.add('preview');   // vista previa en vivo de los controles
 }
 function closeSettings() {
   elSettings.classList.add('hidden');
+  elTouch.classList.remove('preview');
   if (settingsReturn === 'pause') elPause.classList.remove('hidden');
   else { elMenu.classList.remove('hidden'); refreshMenuStats(); }
 }
@@ -3981,6 +4225,32 @@ muteToggle.addEventListener('click', () => {
   save.muted = Sfx.muted; persist();
   refreshSettingsUI();
   if (!Sfx.muted) Sfx.equip();
+});
+
+// ---- Ajustes de controles tactiles (tamaño / altura / opacidad) ----
+tScaleRange.addEventListener('input', () => {
+  save.touchScale = (+tScaleRange.value) / 100;
+  tScaleVal.textContent = tScaleRange.value + '%';
+  applyTouchSettings(); persist();
+});
+tRaiseRange.addEventListener('input', () => {
+  save.touchRaise = +tRaiseRange.value;
+  tRaiseVal.textContent = tRaiseRange.value + 'px';
+  applyTouchSettings(); persist();
+});
+tSpreadRange.addEventListener('input', () => {
+  save.touchSpread = +tSpreadRange.value;
+  tSpreadVal.textContent = tSpreadRange.value + 'px';
+  applyTouchSettings(); persist();
+});
+tOpacityRange.addEventListener('input', () => {
+  save.touchOpacity = (+tOpacityRange.value) / 100;
+  tOpacityVal.textContent = tOpacityRange.value + '%';
+  applyTouchSettings(); persist();
+});
+document.getElementById('tResetBtn').addEventListener('click', () => {
+  save.touchScale = 1; save.touchRaise = 0; save.touchSpread = 0; save.touchOpacity = 1;
+  applyTouchSettings(); persist(); refreshSettingsUI(); Sfx.equip();
 });
 
 function weaponIcon(wp) {
@@ -4148,15 +4418,21 @@ function cosmeticSection(grid, title, reg, owned, equippedId, cat, iconFn) {
     const it = reg[id];
     const own = owned.includes(id);
     const eq = equippedId === id;
+    // halo del icono para skins épicas (las que tienen efecto visual)
+    let glow = null;
+    if (it.fx && it.fx.aura) glow = it.fx.aura;
+    else if (it.glow && it.glow !== true) glow = it.glow;
+    else if (it.glow === true || it.rainbow) glow = it.core || '#ffd24a';
     const card = document.createElement('div');
     card.className = 'card' + (eq ? ' equipped' : '');
     let act;
     if (eq)        act = `<button class="act owned" disabled>✔ EQUIPADO</button>`;
     else if (own)  act = `<button class="act equip" data-cos="${cat}:${id}">EQUIPAR</button>`;
     else           act = `<button class="act buy" data-cosbuy="${cat}:${id}" ${save.money<it.price?'disabled':''}>COMPRAR $${it.price}</button>`;
+    const imgGlow = glow ? `filter:drop-shadow(0 0 5px ${glow}) drop-shadow(0 0 9px ${glow});` : '';
     card.innerHTML = `
-      <div class="nm">${it.name} ${eq?'<span class="tag">★</span>':''}</div>
-      <img class="ico" src="${iconFn(id)}" style="height:48px;width:auto;image-rendering:pixelated;margin:8px auto;display:block" alt="">
+      <div class="nm">${it.name} ${eq?'<span class="tag">★</span>':glow?'<span class="tag" style="color:'+glow+'">✦</span>':''}</div>
+      <img class="ico" src="${iconFn(id)}" style="height:48px;width:auto;image-rendering:pixelated;margin:8px auto;display:block;${imgGlow}" alt="">
       ${act}`;
     grid.appendChild(card);
   }
