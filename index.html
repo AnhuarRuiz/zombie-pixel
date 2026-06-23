@@ -1512,6 +1512,97 @@ function genStreet(reg) {
     placed++;
   }
 }
+// ====================== GENERADORES DE BIOMA (bosque / granja) ======================
+// Inicializa los campos que esperan el pintado (paintGroundLayer/paintBuilding) y la
+// física (buildProps). Igual estructura que genStreet pero sin red de calles.
+function initWildRegion(reg, baseTerr){
+  reg.bcol  = new Uint8Array(GX*GY);
+  reg.terr  = new Uint8Array(GX*GY);
+  if (baseTerr) reg.terr.fill(baseTerr);
+  reg.cars  = [];
+  reg.blocks = [];
+  reg.scenery = [];
+  reg.lanes = [];
+  reg._rooms = [];
+  reg._roomSeq = 0;
+}
+// helpers: solo tocan el interior (deja libre el anillo exterior para poder cruzar a las zonas vecinas)
+const inField=(cx,cy)=>cx>=1&&cy>=1&&cx<GX-1&&cy<GY-1;
+function wildSolid(reg,cx,cy,obj){ if (!inField(cx,cy)||gget(reg,cx,cy)!==0) return false; scene(reg,cx,cy,obj); return true; }
+function wildDecor(reg,cx,cy,obj){ // escenario NO sólido (no bloquea el paso)
+  if (!inField(cx,cy)||gget(reg,cx,cy)!==0) return false;
+  obj.x=cx*CELL+CELL/2; obj.y=cy*CELL+CELL/2; reg.scenery.push(obj); return true; }
+function wildProp(reg,cx,cy){ if (inField(cx,cy)&&gget(reg,cx,cy)===0&&reg.terr[cy*GX+cx]!==1) gset(reg,cx,cy,2); } // caja de botín
+
+// ---- BOSQUE: claro de hierba con pinos, rocas, troncos y arbustos; a veces una cabaña ----
+function genForest(reg){
+  initWildRegion(reg, 2);   // base de césped
+  // claros de tierra (parches transitables de terr 4)
+  for (let i=0;i<3+(Math.random()*3|0);i++){
+    const cx=2+(Math.random()*(GX-4)|0), cy=2+(Math.random()*(GY-4)|0), r=1+(Math.random()*2|0);
+    for (let y=cy-r;y<=cy+r;y++) for (let x=cx-r;x<=cx+r;x++)
+      if (x>0&&y>0&&x<GX&&y<GY && Math.hypot(x-cx,y-cy)<=r) reg.terr[y*GX+x]=4;
+  }
+  // cabaña ocasional (interior accesible)
+  if (Math.random()<0.4){
+    const bw=2+(Math.random()*2|0), bh=2;
+    const bx=2+(Math.random()*(GX-bw-3)|0), by=2+(Math.random()*(GY-bh-3)|0);
+    if (blockFree(reg,bx,by,bx+bw-1,by+bh-1)){ const b=placeBuilding(reg,bx,by,bw,bh); makeEnterable(reg,b,'casa'); }
+  }
+  // pinos (densos pero dispersos: el árbol bloquea el paso)
+  let want=22+(Math.random()*16|0), tr=0;
+  while (want>0 && tr++<400){
+    const cx=1+(Math.random()*(GX-2)|0), cy=1+(Math.random()*(GY-2)|0);
+    if (wildSolid(reg,cx,cy,{type:Math.random()<0.8?'pine':'tree'})) want--;
+  }
+  // rocas y troncos sólidos
+  for (let i=0;i<4+(Math.random()*4|0);i++){ const cx=1+(Math.random()*(GX-2)|0), cy=1+(Math.random()*(GY-2)|0); wildSolid(reg,cx,cy,{type:'rock'}); }
+  for (let i=0;i<3+(Math.random()*3|0);i++){ const cx=1+(Math.random()*(GX-2)|0), cy=1+(Math.random()*(GY-2)|0); wildDecor(reg,cx,cy,{type:'log',horiz:Math.random()<0.5}); }
+  // arbustos decorativos (no bloquean) para dar frondosidad
+  for (let i=0;i<18+(Math.random()*10|0);i++){ const cx=1+(Math.random()*(GX-2)|0), cy=1+(Math.random()*(GY-2)|0); wildDecor(reg,cx,cy,{type:'bush'}); }
+  // alijos de botín
+  for (let i=0;i<2+(Math.random()*2|0);i++){ const cx=2+(Math.random()*(GX-4)|0), cy=2+(Math.random()*(GY-4)|0); wildProp(reg,cx,cy); }
+}
+
+// ---- GRANJA: parcelas de cultivo, vallas, pajares, granero/casa, espantapájaros ----
+function genFarm(reg){
+  initWildRegion(reg, 4);   // base de tierra
+  // 1-2 parcelas de cultivo (terr 5) rodeadas de valla con un hueco de acceso
+  const plots=1+(Math.random()*2|0);
+  for (let p=0;p<plots;p++){
+    const pw=4+(Math.random()*4|0), ph=3+(Math.random()*3|0);
+    const px=2+(Math.random()*(GX-pw-3)|0), py=2+(Math.random()*(GY-ph-3)|0);
+    for (let y=py;y<py+ph;y++) for (let x=px;x<px+pw;x++) if (inField(x,y)) reg.terr[y*GX+x]=5;
+    // valla perimetral con un hueco (gate) en un lado aleatorio
+    const gate=Math.random()*((pw+ph)*2)|0; let gi=0;
+    const edge=(x,y,h)=>{ if (gi++===gate) return; wildSolid(reg,x,y,{type:'fence',horiz:h}); };
+    for (let x=px;x<px+pw;x++){ edge(x,py-1,true); edge(x,py+ph,true); }
+    for (let y=py;y<py+ph;y++){ edge(px-1,y,false); edge(px+pw,y,false); }
+    if (Math.random()<0.7){ const sx=px+(pw>>1), sy=py+(ph>>1); wildSolid(reg,sx,sy,{type:'scarecrow'}); }
+  }
+  // granero grande + casa de campo (interiores accesibles)
+  if (true){
+    const bw=3, bh=2, bx=2+(Math.random()*(GX-bw-3)|0), by=2+(Math.random()*(GY-bh-3)|0);
+    if (blockFree(reg,bx,by,bx+bw-1,by+bh-1)){ const b=placeBuilding(reg,bx,by,bw,bh); makeEnterable(reg,b,'almacen'); }
+  }
+  if (Math.random()<0.6){
+    const bx=2+(Math.random()*(GX-4)|0), by=2+(Math.random()*(GY-4)|0);
+    if (blockFree(reg,bx,by,bx+1,by+1)){ const b=placeBuilding(reg,bx,by,2,2); makeEnterable(reg,b,'casa'); }
+  }
+  // pajares y abrevadero
+  for (let i=0;i<3+(Math.random()*3|0);i++){ const cx=1+(Math.random()*(GX-2)|0), cy=1+(Math.random()*(GY-2)|0); wildSolid(reg,cx,cy,{type:'haystack'}); }
+  if (Math.random()<0.7){ const cx=1+(Math.random()*(GX-2)|0), cy=1+(Math.random()*(GY-2)|0); wildSolid(reg,cx,cy,{type:'trough'}); }
+  // tractor abandonado (vehículo sólido de 2 celdas)
+  if (Math.random()<0.6){ const horiz=Math.random()<0.5;
+    const cx=2+(Math.random()*(GX-4)|0), cy=2+(Math.random()*(GY-4)|0), x2=horiz?cx+1:cx, y2=horiz?cy:cy+1;
+    if (inField(cx,cy)&&inField(x2,y2)&&gget(reg,cx,cy)===0&&gget(reg,x2,y2)===0){
+      gset(reg,cx,cy,4); gset(reg,x2,y2,4); reg.cars.push({x:cx*CELL,y:cy*CELL,horiz,col:'#3a6a3a'}); }
+  }
+  // árboles dispersos en los lindes y alijos de botín
+  for (let i=0;i<5+(Math.random()*4|0);i++){ const cx=1+(Math.random()*(GX-2)|0), cy=1+(Math.random()*(GY-2)|0); wildSolid(reg,cx,cy,{type:'tree'}); }
+  for (let i=0;i<2+(Math.random()*2|0);i++){ const cx=2+(Math.random()*(GX-4)|0), cy=2+(Math.random()*(GY-4)|0); wildProp(reg,cx,cy); }
+}
+
 // crea el interior de un edificio accesible y conecta sus puertas (calle <-> habitación)
 function createRoomFor(reg, spec) {
   const room = newRegion(spec.roomId,'room');
@@ -1717,9 +1808,78 @@ function paintPole(g,x,y){
   g.fillRect(x-11*SC,y-6*SC,3*SC,3*SC); g.fillRect(x+8*SC,y-6*SC,3*SC,3*SC);
   g.fillStyle='#1a1c20'; g.fillRect(x-6*SC,y+8*SC,5*SC,6*SC);
 }
+// ---- Escenario de bosque/granja ----
+function paintPine(g,x,y){   // pino más alto y oscuro que el árbol urbano
+  g.fillStyle='rgba(0,0,0,0.32)'; g.beginPath(); g.ellipse(x+3*SC,y+5*SC,13*SC,10*SC,0,0,7); g.fill();
+  g.fillStyle='#2a1c10'; g.fillRect(x-2*SC,y+2*SC,4*SC,8*SC);                         // tronco
+  for (let i=0;i<4;i++){ const w=(16-i*3)*SC, yy=y-i*7*SC, sh=['#1c3416','#23401c','#2c4f22','#37602b'][i];
+    g.fillStyle=sh; g.beginPath(); g.moveTo(x,yy-9*SC); g.lineTo(x-w,yy+3*SC); g.lineTo(x+w,yy+3*SC); g.closePath(); g.fill(); }
+  g.fillStyle='#6a8a3a'; g.beginPath(); g.moveTo(x,y-30*SC); g.lineTo(x-3*SC,y-24*SC); g.lineTo(x+3*SC,y-24*SC); g.closePath(); g.fill();
+}
+function paintRock(g,x,y){
+  g.fillStyle='rgba(0,0,0,0.30)'; g.beginPath(); g.ellipse(x+2*SC,y+5*SC,12*SC,7*SC,0,0,7); g.fill();
+  g.fillStyle='#4a4d52'; g.beginPath(); g.ellipse(x,y,11*SC,9*SC,0,0,7); g.fill();
+  g.fillStyle='#5c6066'; g.beginPath(); g.ellipse(x-2*SC,y-2*SC,7*SC,5*SC,0,0,7); g.fill();
+  g.fillStyle='#6e7278'; g.beginPath(); g.ellipse(x-3*SC,y-3*SC,3*SC,2*SC,0,0,7); g.fill();
+  g.fillStyle='rgba(0,0,0,0.25)'; g.fillRect(x-6*SC,y+3*SC,12*SC,SC);
+}
+function paintLog(g,x,y,horiz){
+  g.fillStyle='rgba(0,0,0,0.28)';
+  if (horiz){ g.fillRect(x-14*SC,y+4*SC,28*SC,4*SC);
+    g.fillStyle='#4a3826'; g.fillRect(x-14*SC,y-5*SC,28*SC,10*SC);
+    g.fillStyle='#5c4830'; g.fillRect(x-14*SC,y-5*SC,28*SC,3*SC);
+    g.fillStyle='#6a5a3a'; g.beginPath(); g.arc(x-14*SC,y,5*SC,0,7); g.fill();
+    g.fillStyle='#8a6a44'; g.beginPath(); g.arc(x-14*SC,y,3*SC,0,7); g.fill(); }
+  else { g.fillRect(x+4*SC,y-14*SC,4*SC,28*SC);
+    g.fillStyle='#4a3826'; g.fillRect(x-5*SC,y-14*SC,10*SC,28*SC);
+    g.fillStyle='#5c4830'; g.fillRect(x-5*SC,y-14*SC,3*SC,28*SC);
+    g.fillStyle='#6a5a3a'; g.beginPath(); g.arc(x,y-14*SC,5*SC,0,7); g.fill();
+    g.fillStyle='#8a6a44'; g.beginPath(); g.arc(x,y-14*SC,3*SC,0,7); g.fill(); }
+}
+function paintHaystack(g,x,y){
+  g.fillStyle='rgba(0,0,0,0.30)'; g.beginPath(); g.ellipse(x+2*SC,y+6*SC,14*SC,7*SC,0,0,7); g.fill();
+  g.fillStyle='#a8851f'; g.beginPath(); g.ellipse(x,y,13*SC,11*SC,0,0,7); g.fill();
+  g.fillStyle='#c4a02a'; g.beginPath(); g.ellipse(x-2*SC,y-2*SC,9*SC,7*SC,0,0,7); g.fill();
+  g.strokeStyle='rgba(90,70,16,0.55)'; g.lineWidth=SC;
+  for (let i=-2;i<=2;i++){ g.beginPath(); g.moveTo(x-12*SC,y+i*4*SC); g.lineTo(x+12*SC,y+i*4*SC); g.stroke(); }
+  g.fillStyle='#7a5e14'; g.fillRect(x-3*SC,y-11*SC,6*SC,22*SC);   // cincha
+}
+function paintFence(g,x,y,horiz){
+  g.fillStyle='rgba(0,0,0,0.28)';
+  if (horiz){ g.fillRect(x-19*SC,y+6*SC,38*SC,3*SC);
+    g.fillStyle='#5a4326'; g.fillRect(x-18*SC,y-6*SC,3*SC,16*SC); g.fillRect(x-2*SC,y-6*SC,3*SC,16*SC); g.fillRect(x+15*SC,y-6*SC,3*SC,16*SC); // postes
+    g.fillStyle='#6e5436'; g.fillRect(x-19*SC,y-4*SC,38*SC,3*SC); g.fillRect(x-19*SC,y+2*SC,38*SC,3*SC); }   // travesaños
+  else { g.fillRect(x+6*SC,y-19*SC,3*SC,38*SC);
+    g.fillStyle='#5a4326'; g.fillRect(x-6*SC,y-18*SC,16*SC,3*SC); g.fillRect(x-6*SC,y-2*SC,16*SC,3*SC); g.fillRect(x-6*SC,y+15*SC,16*SC,3*SC);
+    g.fillStyle='#6e5436'; g.fillRect(x-4*SC,y-19*SC,3*SC,38*SC); g.fillRect(x+2*SC,y-19*SC,3*SC,38*SC); }
+}
+function paintScarecrow(g,x,y){
+  g.fillStyle='rgba(0,0,0,0.30)'; g.beginPath(); g.ellipse(x,y+10*SC,8*SC,4*SC,0,0,7); g.fill();
+  g.fillStyle='#6a5436'; g.fillRect(x-2*SC,y-10*SC,4*SC,22*SC);          // poste vertical
+  g.fillStyle='#5a4326'; g.fillRect(x-12*SC,y-4*SC,24*SC,3*SC);          // brazos
+  g.fillStyle='#7a3a2a'; g.fillRect(x-8*SC,y-3*SC,16*SC,11*SC);          // camisa harapienta
+  g.fillStyle='#8a4a36'; g.fillRect(x-8*SC,y-3*SC,16*SC,3*SC);
+  g.fillStyle='#c4a02a'; g.beginPath(); g.arc(x,y-9*SC,6*SC,0,7); g.fill();   // cabeza de saco
+  g.fillStyle='#1a1a1a'; g.fillRect(x-3*SC,y-10*SC,2*SC,2*SC); g.fillRect(x+1*SC,y-10*SC,2*SC,2*SC);
+  g.fillStyle='#6a5414'; g.beginPath(); g.moveTo(x-7*SC,y-13*SC); g.lineTo(x+7*SC,y-13*SC); g.lineTo(x,y-19*SC); g.closePath(); g.fill(); // sombrero
+}
+function paintTrough(g,x,y){
+  g.fillStyle='rgba(0,0,0,0.28)'; g.fillRect(x-14*SC,y+4*SC,28*SC,4*SC);
+  g.fillStyle='#3a2c1c'; g.fillRect(x-14*SC,y-6*SC,28*SC,13*SC);
+  g.fillStyle='#5a4632'; g.fillRect(x-14*SC,y-6*SC,28*SC,3*SC);
+  g.fillStyle='#22414f'; g.fillRect(x-12*SC,y-3*SC,24*SC,8*SC);          // agua
+  g.fillStyle='#2c5160'; g.fillRect(x-10*SC,y-2*SC,7*SC,3*SC);
+}
 function paintScenery(g,reg){
   for (const s of reg.scenery||[]){
     if (s.type==='tree') paintTree(g,s.x,s.y);
+    else if (s.type==='pine') paintPine(g,s.x,s.y);
+    else if (s.type==='rock') paintRock(g,s.x,s.y);
+    else if (s.type==='log') paintLog(g,s.x,s.y,s.horiz);
+    else if (s.type==='haystack') paintHaystack(g,s.x,s.y);
+    else if (s.type==='fence') paintFence(g,s.x,s.y,s.horiz);
+    else if (s.type==='scarecrow') paintScarecrow(g,s.x,s.y);
+    else if (s.type==='trough') paintTrough(g,s.x,s.y);
     else if (s.type==='bench') paintBench(g,s.x,s.y,s.horiz);
     else if (s.type==='stall') paintStall(g,s.x,s.y,s.col);
     else if (s.type==='fountain') paintFountain(g,s.x,s.y);
@@ -1729,8 +1889,8 @@ function paintScenery(g,reg){
     else if (s.type==='pole') paintPole(g,s.x,s.y);
   }
 }
-// Suelo por tipo de terreno (terr): 0 acera/concreto · 1 calzada · 2 césped · 3 plaza
-const TERR_BASE=['#3a3d42','#2c2f34','#46571f','#54514a'];
+// Suelo por tipo de terreno (terr): 0 acera/concreto · 1 calzada · 2 césped · 3 plaza · 4 tierra · 5 cultivo
+const TERR_BASE=['#3a3d42','#2c2f34','#46571f','#54514a','#5a4630','#6b5526'];
 function paintGroundLayer(g,reg){
   const T=reg.terr;
   const cellT=(x,y)=>T[((y/CELL)|0)*GX+((x/CELL)|0)];
@@ -2023,6 +2183,48 @@ function paintCity(reg){
   reg.bg=b;
 }
 
+// ---- Detallado de suelo de bioma (sobre la capa base de terreno) ----
+function paintForestGround(g,reg){
+  const T=reg.terr;
+  // hojarasca sobre hierba y tierra
+  const LEAF=['#6a7a2a','#7a6a2a','#8a5a24','#5a6a26','#9a7a2a'];
+  for (let i=0;i<520;i++){ const x=Math.random()*W, y=Math.random()*H, c=((y/CELL)|0)*GX+((x/CELL)|0);
+    if (T[c]!==2 && T[c]!==4) continue;
+    g.fillStyle=LEAF[Math.random()*LEAF.length|0]; g.fillRect(x|0,y|0,SC,SC); }
+  // raíces/manchas oscuras en los claros de tierra
+  for (let i=0;i<7;i++){ const x=Math.random()*W,y=Math.random()*H, r=(10+Math.random()*16)*SC;
+    if (T[((y/CELL)|0)*GX+((x/CELL)|0)]!==4) continue;
+    g.fillStyle='rgba(40,30,18,0.35)'; g.beginPath(); g.ellipse(x,y,r,r*0.8,0,0,7); g.fill(); }
+}
+function paintFarmGround(g,reg){
+  const T=reg.terr;
+  // surcos en los cultivos (terr 5) y en la tierra (terr 4)
+  for (let cy=0;cy<GY;cy++) for (let cx=0;cx<GX;cx++){
+    const t=T[cy*GX+cx]; if (t!==5 && t!==4) continue;
+    const x=cx*CELL, y=cy*CELL;
+    g.fillStyle='rgba(0,0,0,0.16)';
+    for (let r=0;r<CELL;r+=6*SC) g.fillRect(x,y+r,CELL,SC);
+    if (t===5){ g.fillStyle='#4f6b24';   // brotes verdes en los surcos
+      for (let r=3*SC;r<CELL;r+=6*SC) for (let cxx=4*SC;cxx<CELL;cxx+=7*SC)
+        g.fillRect(x+cxx+((r/6)&1?3*SC:0),y+r-2*SC,2*SC,3*SC); }
+  }
+}
+function paintWild(reg){
+  const b=document.createElement('canvas'); b.width=W; b.height=H;
+  const g=b.getContext('2d'); g.imageSmoothingEnabled=false;
+  paintGroundLayer(g,reg);                            // base por terreno (incluye briznas en césped)
+  if (reg.kind==='farm') paintFarmGround(g,reg); else paintForestGround(g,reg);
+  for (let cy=0;cy<GY;cy++) for (let cx=0;cx<GX;cx++){
+    const v=reg.grid[cy*GX+cx], x=cx*CELL, y=cy*CELL;
+    if (v===1) paintBuilding(g,x,y,reg,cx,cy);         // cabaña/granero/casa
+    else if (v===3) paintDoor(g,x,y);
+  }
+  paintScenery(g,reg);                                // pinos, rocas, vallas, pajares...
+  for (const c of reg.cars||[]) drawParkedCar(g,c);   // tractor/vehículo abandonado
+  decorateDebris(g,reg);
+  reg.bg=b;
+}
+
 // ---- Pintado del interior (temático y decorado) ----
 function paintRoomDecor(g,d,th){
   if (d.type==='rug'){
@@ -2181,11 +2383,23 @@ function damageProp(x,y,dmg){
   return true;
 }
 
+// Mapa del mundo 7x7 (49 zonas): ciudad en el centro, BOSQUE al noroeste y
+// GRANJA al sureste. S=calle · F=bosque · R=granja. Arrancas en el centro (c_3_3).
+const WORLD_MAP = [
+  ['F','F','F','F','S','S','S'],
+  ['F','F','F','S','S','S','S'],
+  ['F','F','S','S','S','S','S'],
+  ['S','S','S','S','S','S','R'],
+  ['S','S','S','S','S','R','R'],
+  ['S','S','S','S','R','R','R'],
+  ['S','S','S','R','R','R','R'],
+];
+const KIND_OF = { S:'street', F:'forest', R:'farm' };
 function buildCityWorld() {
   world = { regions:{}, map:'city' };
-  const GW=5, GH=5;   // 25 secciones de calle (+ sus interiores) — mapa grande
+  const GH=WORLD_MAP.length, GW=WORLD_MAP[0].length;
   for (let gy=0;gy<GH;gy++) for (let gx=0;gx<GW;gx++)
-    world.regions['c_'+gx+'_'+gy] = newRegion('c_'+gx+'_'+gy,'street');
+    world.regions['c_'+gx+'_'+gy] = newRegion('c_'+gx+'_'+gy, KIND_OF[WORLD_MAP[gy][gx]]);
   for (let gy=0;gy<GH;gy++) for (let gx=0;gx<GW;gx++){
     const r=world.regions['c_'+gx+'_'+gy];
     if (gx>0)    r.edges.l='c_'+(gx-1)+'_'+gy;
@@ -2193,7 +2407,12 @@ function buildCityWorld() {
     if (gy>0)    r.edges.u='c_'+gx+'_'+(gy-1);
     if (gy<GH-1) r.edges.d='c_'+gx+'_'+(gy+1);
   }
-  for (const id in world.regions) genStreet(world.regions[id]);
+  for (const id in world.regions){
+    const reg=world.regions[id];
+    if (reg.kind==='forest') genForest(reg);
+    else if (reg.kind==='farm') genFarm(reg);
+    else genStreet(reg);
+  }
   // crea los interiores accesibles que cada zona generó (en una pasada aparte para no
   // mutar world.regions mientras se itera)
   for (const id of Object.keys(world.regions)){
@@ -2203,12 +2422,14 @@ function buildCityWorld() {
   for (const id in world.regions) buildProps(world.regions[id]);
   // pintado PEREZOSO: cada zona se pinta la primera vez que se entra (ensureBg),
   // así el arranque es instantáneo aunque el mundo sea grande.
-  curRegion = world.regions['c_2_2'];   // arranca en el centro del mundo 5x5
+  curRegion = world.regions['c_3_3'];   // arranca en el centro del mundo 7x7
   ensureBg(curRegion);
 }
 function ensureBg(reg){
   if (reg.bg) return;
-  (reg.kind==='room' ? paintRoom : paintCity)(reg);
+  if (reg.kind==='room') paintRoom(reg);
+  else if (reg.kind==='forest' || reg.kind==='farm') paintWild(reg);
+  else paintCity(reg);
 }
 function buildWorld(){ buildCityWorld(); }
 
@@ -2216,8 +2437,11 @@ const THEME_NAMES = {
   casa:'Casa', tienda:'Tienda', garaje:'Garaje', oficina:'Oficina',
   almacen:'Almacén', clinica:'Clínica',
 };
+const BIOME_NAMES = { forest:'Bosque', farm:'Granja', street:'Ciudad' };
 function regionLabel(){
   if (curRegion.kind==='room') return THEME_NAMES[curRegion.theme] || 'Interior';
+  if (curRegion.kind==='forest') return 'Bosque';
+  if (curRegion.kind==='farm') return 'Granja';
   if (curRegion.kind==='field') return MAPS.city.name;
   const m=curRegion.id.match(/c_(\d)_(\d)/);
   return m ? `Zona ${+m[1]+1}-${+m[2]+1}` : '';
@@ -2235,8 +2459,12 @@ function nudgeToFree(px,py){
 }
 function goRegion(id, x, y){
   if (!world.regions[id]) return;
+  const prevBiome = curRegion && curRegion.kind!=='room' ? curRegion.kind : null;
   curRegion = world.regions[id];
   ensureBg(curRegion);   // pinta el fondo la primera vez que se visita
+  // aviso al cambiar de bioma (orientación: descubrir bosque/granja)
+  if (curRegion.kind!=='room' && BIOME_NAMES[curRegion.kind] && curRegion.kind!==prevBiome)
+    toast('Has llegado a: ' + BIOME_NAMES[curRegion.kind]);
   zombies = curRegion.zombies; pickups = curRegion.pickups; decals = curRegion.decals;
   bullets=[]; spits=[]; particles=[]; shocks=[]; pools=[];
   if (curRegion.kind==='room'){ curRegion.doorHP=100; curRegion.broken=false; curRegion.bangCd=0; curRegion.breachCd=0; }
